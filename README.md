@@ -1,22 +1,34 @@
-# AeroBeat Tool Template
+# AeroBeat Tool Video Player
 
-This is the official template for creating **Tool** repositories within the current AeroBeat v1 architecture.
+This repo owns the reusable **video playback contract** for the current AeroBeat tool architecture.
 
 It should be read against the locked product direction from `aerobeat-docs`:
 
 - **Primary release target:** PC community first
 - **Official v1 gameplay features:** Boxing and Flow
 - **Official v1 gameplay input:** camera only
-- **Tool stance:** tools should stay workflow-oriented and gameplay-mode agnostic enough to support the current product slice without implying equal-status future gameplay/input/platform scope
-- **Tool lane ownership:** shared tool-side DTOs, progress/result models, and workflow interfaces belong in `aerobeat-tool-core`; concrete authoring/import/export/validation tooling belongs in specific `aerobeat-tool-*` repos
+- **Tool stance:** this repo owns generic playback lifecycle, time, surface binding, and backend abstraction rather than camera-tracking-specific replay logic
+- **Replay ownership split:** replay consumers such as camera tracking should consume this tool's stable playback contract instead of re-implementing generic play/pause/seek/surface ownership
+
+## Current first-slice scope
+
+The current implementation is intentionally a **contract shell**, not a real vendor playback integration yet.
+
+The sharable package surface currently centers on `src/AeroToolManager.gd`, which exposes:
+
+- the frozen top-level playback states (`idle`, `loading`, `ready`, `playing`, `paused`, `stopping`, `error`)
+- the first-pass playback signals (`state_changed`, `position_changed`, `media_loaded`, `playback_finished`, `error_raised`)
+- source normalization helpers for the current dictionary contract (`path`, `kind`, `loop`, `autoplay`, `start_time`, `rate`)
+- a backend interface boundary so vendor-specific playback can land later without breaking callers
+- a deterministic fake backend used by repo-local tests in the hidden `.testbed/` project
+- the output-surface attach/detach contract needed by replay and presentation consumers
 
 ## 📋 Repository Details
 
-- **Type:** Tool template
+- **Type:** Video playback tool package
 - **License:** **Mozilla Public License 2.0 (MPL 2.0)**
-- **Dependency contract:**
-  - `aerobeat-tool-core` — required shared tool/workflow contract
-  - additional adjacent lane/core repos only when the specific tool actually consumes them (commonly `aerobeat-content-core` or `aerobeat-asset-core`)
+- **Current vendor status:** fake/test backend only in this first slice
+- **Future vendor direction:** Godot-native and other playback vendors should slot in behind the repo-owned backend interface rather than redefining the public contract
 
 ## GodotEnv development flow
 
@@ -39,7 +51,11 @@ cd .testbed
 godotenv addons install
 ```
 
-That restores this repo's current dev/test manifest into `.testbed/addons/`. Canonically, Tool templates should keep the baseline manifest narrow: `aerobeat-tool-core` plus test-only tooling.
+If addon state gets noisy during AeroBeat polyrepo work, use the canonical helper instead of editing mirrored addon payloads directly:
+
+```bash
+/workspace/scripts/godotenv-sync --repo /workspace/projects/aerobeat/aerobeat-tool-video-player
+```
 
 ### Open the workbench
 
@@ -49,7 +65,7 @@ From the repo root:
 godot --editor --path .testbed
 ```
 
-Use this `.testbed/` project as the canonical direct-development and bugfinding surface for tool-template work.
+Use this `.testbed/` project as the canonical direct-development and bugfinding surface for contract and backend work.
 
 ### Import smoke check
 
@@ -73,8 +89,6 @@ godot --headless --path .testbed --script addons/gut/gut_cmdln.gd \
 ### Validation notes
 
 - `.testbed/addons.jsonc` is the committed dev/test dependency contract.
-- The canonical template manifest for this repo is `aerobeat-tool-core` + `gut`.
-- `aerobeat-tool-core` is currently pinned to `main` intentionally because the repo does not yet have release tags; switch to a tag once tagged releases exist.
-- If a concrete tool needs adjacent lane repos, add them intentionally rather than restoring a universal `aerobeat-core` baseline.
-- Repo-local unit tests live under `.testbed/tests/` and currently validate repo metadata plus the template stub contract.
-- The current package shape is consumed from the repo root (`subfolder: "/"`) for downstream installs.
+- The current manifest remains intentionally narrow: `aerobeat-tool-core` plus `gut`.
+- The fake backend is the official deterministic proving surface for this first slice; real vendor integration is a follow-up.
+- Repo-local unit tests should prove the stable contract shell first, then expand as concrete vendor backends are added.
