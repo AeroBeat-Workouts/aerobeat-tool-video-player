@@ -57,9 +57,9 @@ Use these reference IDs in implementation notes, QA evidence, and audit findings
 - `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-tool-video-player/.testbed/tests/*.gd`
 - `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-tool-video-player/plugin.cfg` if naming/entry-point metadata must align with the contract shell
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Planning complete; implementation not started in this lane.
+**Results:** Implemented the first `VideoPlayer` contract-shell slice in commit `c635c34` (`Implement video player contract shell`) and pushed it to `origin/main`. Landed the repo-root singleton facade (`src/AeroToolManager.gd`), backend boundary (`src/AeroVideoPlayerBackend.gd`), deterministic fake backend (`src/AeroVideoPlayerFakeBackend.gd`), updated plugin/readme metadata, and replaced template-only tests with contract-shell coverage in `.testbed/tests/`. Validation passed with repo-local `.testbed` checks: `godot --headless --path .testbed --import` and `godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit` (`9/9` tests passing on Godot `4.6.2`). References validated: `REF-01`, `REF-02`, `REF-03`, `REF-04`, `REF-05`, `REF-06`. Ready for QA handoff.
 
 ---
 
@@ -128,24 +128,23 @@ This creates a strict repo-local `coder → QA → auditor` chain.
 **Status:** ⚠️ Partial
 
 **What We Built:**
-- Inspected the fresh `aerobeat-tool-video-player` repo state.
-- Confirmed the repo is still template-shaped with only the template tool manager and template-safe tests.
-- Initialized the repo-local Beads database for executable work.
-- Created the first repo-local implementation plan for the `VideoPlayer` contract-shell slice.
-- Created the execution beads for coder → QA → auditor with explicit dependencies.
+- Planned and staged the repo-local coder → QA → auditor bead chain for the first `VideoPlayer` contract-shell slice.
+- Implemented the repo-root `AeroToolManager` contract shell with the first stable playback state/error/signal vocabulary.
+- Added the backend boundary (`src/AeroVideoPlayerBackend.gd`) and deterministic fake backend (`src/AeroVideoPlayerFakeBackend.gd`) so later vendor playback work can stay behind a contract.
+- Replaced template-only `.testbed` coverage with contract-shell tests and refreshed README/plugin metadata to describe the real package surface.
 
 **Reference Check:**
-- `REF-01` confirmed repo and `.testbed` conventions.
-- `REF-02` supplied the first-pass `VideoPlayer` API contract.
-- `REF-03` and `REF-04` supplied the cross-repo ownership boundary with camera tracking.
-- `REF-05` and `REF-06` confirmed the current implementation/test starting point.
+- `REF-01` repo and `.testbed` conventions were followed.
+- `REF-02` first-pass `VideoPlayer` API assumptions were implemented as the initial contract shell.
+- `REF-03` and `REF-04` ownership boundaries were preserved: playback lifecycle/time/surface ownership remains in `tool-video-player`, without collapsing camera-tracking responsibilities into this slice.
+- `REF-05` and `REF-06` were superseded by the new contract-shell implementation and matching tests.
 
 **Commits:**
-- None in this planning lane.
+- `c635c34` - Implement video player contract shell
 
 **Lessons Learned:**
-- The owning repo had `.beads/` scaffolding but no initialized database yet, so `bd init --quiet` was required before creating repo-local work items.
-- The first implementation slice should focus on contract stabilization and deterministic tests, not premature vendor playback integration.
+- The first implementation slice can deliver a real, testable contract without prematurely selecting a concrete playback vendor.
+- Keeping the fake backend deterministic made the repo-local `.testbed` validation fast and stable while preserving the cross-repo replay boundary.
 
 ---
 
