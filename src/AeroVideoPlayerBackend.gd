@@ -1,13 +1,13 @@
-## Backend interface contract for AeroBeat video playback vendors.
+## Tool-local backend alias for the shared AeroBeat video playback contract.
 ##
-## Concrete backends should preserve the dictionary/signal vocabulary owned by the
-## repo-root AeroToolManager facade while hiding vendor-specific player details.
+## The shared playback vocabulary lives in aerobeat-tool-core. This repo keeps a
+## local backend type name so downstream consumers can reference a stable
+## tool-video-player surface while method/result semantics stay aligned to the
+## shared contract.
+class_name AeroVideoPlayerBackend
 extends RefCounted
 
-const RESULT_SUCCESS := "success"
-const RESULT_CODE := "code"
-const RESULT_MESSAGE := "message"
-const RESULT_DETAIL := "detail"
+const CoreContract := preload("res://addons/aerobeat-tool-core/globals/aero_video_playback_contract.gd")
 
 func load(_source: Dictionary) -> Dictionary:
 	return _unsupported("load")
@@ -31,14 +31,7 @@ func set_rate(_rate: float) -> Dictionary:
 	return _unsupported("set_rate")
 
 func get_state() -> Dictionary:
-	return {
-		"state": "idle",
-		"position": 0.0,
-		"duration": 0.0,
-		"loop": false,
-		"rate": 1.0,
-		"surface_attached": false,
-	}
+	return CoreContract.build_state_snapshot()
 
 func get_position() -> float:
 	return float(get_state().get("position", 0.0))
@@ -59,9 +52,8 @@ func get_last_error() -> Dictionary:
 	return {}
 
 func _unsupported(method_name: String) -> Dictionary:
-	return {
-		RESULT_SUCCESS: false,
-		RESULT_CODE: "backend_method_unimplemented",
-		RESULT_MESSAGE: "%s is not implemented on this backend." % method_name,
-		RESULT_DETAIL: {"method": method_name},
-	}
+	return CoreContract.fail(
+		"backend_method_unimplemented",
+		"%s is not implemented on this backend." % method_name,
+		{"method": method_name}
+	)

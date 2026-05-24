@@ -1,9 +1,14 @@
 ## Public runtime entrypoint for the AeroBeat tool-video-player package.
 ##
-## The first slice keeps the stable replay-facing video contract centered on
-## AeroToolManager while concrete playback vendors stay behind a backend boundary.
-class_name AeroToolManager
+## The stable tool-facing playback facade lives here as AeroVideoPlayerManager.
+## Shared playback vocabulary comes from aerobeat-tool-core while concrete
+## vendor playback remains behind an injectable backend boundary.
+class_name AeroVideoPlayerManager
 extends Node
+
+const AeroVideoPlaybackContract := preload("res://addons/aerobeat-tool-core/globals/aero_video_playback_contract.gd")
+const BackendInterfaceScript := preload("res://src/AeroVideoPlayerBackend.gd")
+const FakeBackendScript := preload("res://src/AeroVideoPlayerFakeBackend.gd")
 
 #region SIGNALS
 signal initialized
@@ -25,14 +30,14 @@ enum PlaybackState {
 	ERROR,
 }
 
-const VERSION: String = "0.1.0"
-const STATE_IDLE := "idle"
-const STATE_LOADING := "loading"
-const STATE_READY := "ready"
-const STATE_PLAYING := "playing"
-const STATE_PAUSED := "paused"
-const STATE_STOPPING := "stopping"
-const STATE_ERROR := "error"
+const VERSION: String = "0.2.0"
+const STATE_IDLE := AeroVideoPlaybackContract.STATE_IDLE
+const STATE_LOADING := AeroVideoPlaybackContract.STATE_LOADING
+const STATE_READY := AeroVideoPlaybackContract.STATE_READY
+const STATE_PLAYING := AeroVideoPlaybackContract.STATE_PLAYING
+const STATE_PAUSED := AeroVideoPlaybackContract.STATE_PAUSED
+const STATE_STOPPING := AeroVideoPlaybackContract.STATE_STOPPING
+const STATE_ERROR := AeroVideoPlaybackContract.STATE_ERROR
 const STATE_NAMES := {
 	PlaybackState.IDLE: STATE_IDLE,
 	PlaybackState.LOADING: STATE_LOADING,
@@ -43,24 +48,16 @@ const STATE_NAMES := {
 	PlaybackState.ERROR: STATE_ERROR,
 }
 
-const SOURCE_KIND_FILE := "file"
-const SOURCE_KIND_URL := "url"
-const SOURCE_KIND_STREAM := "stream"
-const SOURCE_KIND_PACKAGE := "package"
-const SOURCE_KINDS := [
-	SOURCE_KIND_FILE,
-	SOURCE_KIND_URL,
-	SOURCE_KIND_STREAM,
-	SOURCE_KIND_PACKAGE,
-]
+const SOURCE_KIND_FILE := AeroVideoPlaybackContract.SOURCE_KIND_FILE
+const SOURCE_KIND_URL := AeroVideoPlaybackContract.SOURCE_KIND_URL
+const SOURCE_KIND_STREAM := AeroVideoPlaybackContract.SOURCE_KIND_STREAM
+const SOURCE_KIND_PACKAGE := AeroVideoPlaybackContract.SOURCE_KIND_PACKAGE
+const SOURCE_KINDS := AeroVideoPlaybackContract.SOURCE_KINDS
 
-const ERROR_INVALID_SOURCE := "invalid_source"
-const ERROR_INVALID_SURFACE := "invalid_surface"
-const ERROR_BACKEND_REJECTED := "backend_rejected"
-const ERROR_NOT_READY := "not_ready"
-
-const BackendInterfaceScript := preload("res://src/AeroVideoPlayerBackend.gd")
-const FakeBackendScript := preload("res://src/AeroVideoPlayerFakeBackend.gd")
+const ERROR_INVALID_SOURCE := AeroVideoPlaybackContract.ERROR_INVALID_SOURCE
+const ERROR_INVALID_SURFACE := AeroVideoPlaybackContract.ERROR_INVALID_SURFACE
+const ERROR_BACKEND_REJECTED := AeroVideoPlaybackContract.ERROR_BACKEND_REJECTED
+const ERROR_NOT_READY := AeroVideoPlaybackContract.ERROR_NOT_READY
 #endregion
 
 #region EXPORTS
@@ -69,7 +66,7 @@ const FakeBackendScript := preload("res://src/AeroVideoPlayerFakeBackend.gd")
 
 #region PRIVATE VARIABLES
 var _is_initialized: bool = false
-var _backend: RefCounted
+var _backend: AeroVideoPlayerBackend
 var _backend_name: String = ""
 var _state_name: String = STATE_IDLE
 var _state_code: int = PlaybackState.IDLE
@@ -93,7 +90,7 @@ func _initialize() -> void:
 #endregion
 
 #region PUBLIC API
-func set_backend(backend: RefCounted) -> void:
+func set_backend(backend: AeroVideoPlayerBackend) -> void:
 	if backend == null:
 		backend = FakeBackendScript.new()
 	_backend = backend
@@ -101,34 +98,18 @@ func set_backend(backend: RefCounted) -> void:
 	if _surface != null and _backend.has_method("attach_surface"):
 		_backend.attach_surface(_surface)
 
-func get_backend() -> RefCounted:
+func get_backend() -> AeroVideoPlayerBackend:
 	_initialize()
 	return _backend
 
+func create_default_backend() -> AeroVideoPlayerBackend:
+	return FakeBackendScript.new()
+
 func get_default_source_config() -> Dictionary:
-	return {
-		"path": "",
-		"kind": SOURCE_KIND_FILE,
-		"loop": false,
-		"autoplay": false,
-		"start_time": 0.0,
-		"rate": 1.0,
-		"metadata": {},
-	}
+	return AeroVideoPlaybackContract.get_default_source_config()
 
 func normalize_source(source: Dictionary) -> Dictionary:
-	var normalized := get_default_source_config()
-	for key in source.keys():
-		normalized[key] = source[key]
-	normalized["path"] = String(normalized.get("path", "")).strip_edges()
-	normalized["kind"] = String(normalized.get("kind", SOURCE_KIND_FILE)).strip_edges().to_lower()
-	normalized["loop"] = bool(normalized.get("loop", false))
-	normalized["autoplay"] = bool(normalized.get("autoplay", false))
-	normalized["start_time"] = maxf(0.0, float(normalized.get("start_time", 0.0)))
-	normalized["rate"] = float(normalized.get("rate", 1.0))
-	if typeof(normalized.get("metadata", {})) != TYPE_DICTIONARY:
-		normalized["metadata"] = {}
-	return normalized
+	return AeroVideoPlaybackContract.normalize_source(source)
 
 func can_load_source(source: Dictionary) -> bool:
 	return _validate_source(normalize_source(source)).is_empty()
@@ -136,7 +117,7 @@ func can_load_source(source: Dictionary) -> bool:
 func load(source: Dictionary) -> void:
 	_initialize()
 	if not is_active:
-		_raise_error(ERROR_NOT_READY, "AeroToolManager is inactive.", {"source": source.duplicate(true)}, true)
+		_raise_error(ERROR_NOT_READY, "AeroVideoPlayerManager is inactive.", {"source": source.duplicate(true)}, true)
 		return
 	var normalized := normalize_source(source)
 	var validation_error := _validate_source(normalized)
@@ -230,7 +211,7 @@ func set_rate(rate: float) -> void:
 func get_state() -> Dictionary:
 	_initialize()
 	var backend_state: Dictionary = _backend.get_state() if _backend != null else {}
-	return {
+	return AeroVideoPlaybackContract.build_state_snapshot({
 		"state": _state_name,
 		"state_code": _state_code,
 		"source": _loaded_source.duplicate(true),
@@ -242,7 +223,7 @@ func get_state() -> Dictionary:
 		"surface_attached": bool(backend_state.get("surface_attached", _surface != null)),
 		"backend": _backend_name,
 		"last_error": _last_error.duplicate(true),
-	}
+	})
 
 func get_duration() -> float:
 	_initialize()
@@ -285,25 +266,7 @@ func get_last_error() -> Dictionary:
 
 #region PRIVATE HELPERS
 func _validate_source(source: Dictionary) -> Dictionary:
-	if String(source.get("path", "")).is_empty():
-		return {
-			"field": "path",
-			"message": "Video source path must be a non-empty string.",
-			"source": source.duplicate(true),
-		}
-	if not SOURCE_KINDS.has(source.get("kind", SOURCE_KIND_FILE)):
-		return {
-			"field": "kind",
-			"message": "Video source kind must be one of %s." % ", ".join(SOURCE_KINDS),
-			"source": source.duplicate(true),
-		}
-	if float(source.get("rate", 1.0)) <= 0.0:
-		return {
-			"field": "rate",
-			"message": "Playback rate must be greater than zero.",
-			"source": source.duplicate(true),
-		}
-	return {}
+	return AeroVideoPlaybackContract.validate_source(source)
 
 func _ensure_loaded(message: String) -> bool:
 	if _loaded_source.is_empty():
@@ -325,13 +288,13 @@ func _emit_position_changed(seconds: float, duration: float) -> void:
 	position_changed.emit(seconds, normalized)
 
 func _apply_result(result: Dictionary, fallback_code: String, fallback_message: String) -> void:
-	if bool(result.get("success", false)):
+	if bool(result.get(AeroVideoPlaybackContract.RESULT_SUCCESS, false)):
 		_last_error = {}
 		return
 	_raise_error(
-		String(result.get("code", fallback_code)),
-		String(result.get("message", fallback_message)),
-		result.get("detail", {}),
+		String(result.get(AeroVideoPlaybackContract.RESULT_CODE, fallback_code)),
+		String(result.get(AeroVideoPlaybackContract.RESULT_MESSAGE, fallback_message)),
+		result.get(AeroVideoPlaybackContract.RESULT_DETAIL, {}),
 		true
 	)
 

@@ -10,25 +10,43 @@ It should be read against the locked product direction from `aerobeat-docs`:
 - **Tool stance:** this repo owns generic playback lifecycle, time, surface binding, and backend abstraction rather than camera-tracking-specific replay logic
 - **Replay ownership split:** replay consumers such as camera tracking should consume this tool's stable playback contract instead of re-implementing generic play/pause/seek/surface ownership
 
-## Current first-slice scope
+## Current facade scope
 
-The current implementation is intentionally a **contract shell**, not a real vendor playback integration yet.
+The sharable package surface now centers on `src/AeroVideoPlayerManager.gd`.
 
-The sharable package surface currently centers on `src/AeroToolManager.gd`, which exposes:
+`AeroVideoPlayerManager` is the stable public facade for downstream tool consumers. It keeps the higher-level playback lifecycle signals and state transitions in this repo while consuming the shared vocabulary from `aerobeat-tool-core`.
+
+The current implementation exposes:
 
 - the frozen top-level playback states (`idle`, `loading`, `ready`, `playing`, `paused`, `stopping`, `error`)
-- the first-pass playback signals (`state_changed`, `position_changed`, `media_loaded`, `playback_finished`, `error_raised`)
+- the playback signals (`state_changed`, `position_changed`, `media_loaded`, `playback_finished`, `error_raised`)
 - source normalization helpers for the current dictionary contract (`path`, `kind`, `loop`, `autoplay`, `start_time`, `rate`)
-- a backend interface boundary so vendor-specific playback can land later without breaking callers
-- a deterministic fake backend used by repo-local tests in the hidden `.testbed/` project
+- a backend injection boundary via `src/AeroVideoPlayerBackend.gd`
+- a deterministic fake backend used by repo-local tests and the hidden `.testbed/` workbench
 - the output-surface attach/detach contract needed by replay and presentation consumers
+
+## Shared contract ownership split
+
+- `aerobeat-tool-core` owns the shared playback vocabulary and backend interface slice (`AeroVideoPlaybackContract`, `AeroVideoPlaybackBackend`).
+- `aerobeat-tool-video-player` owns the tool-facing orchestration facade (`AeroVideoPlayerManager`), lifecycle signals, normalized state transitions, and backend injection policy.
+- Vendor repos such as Godot-native playback should adapt their runtime-specific behavior behind this facade rather than redefining the public tool contract.
+
+## Repo-local proving surface
+
+The hidden `.testbed/` workbench now includes a real `.ogv` proving surface.
+
+- `.testbed/assets/videos/calm_blue_sea_1.ogv` reuses the proven environment-lane sample.
+- `.testbed/scenes/video_player_testbed.tscn` provides a repo-local manual smoke scene.
+- `.testbed/scripts/video_player_testbed.gd` wires the public facade into that scene using the real sample path.
+
+This keeps the repo honest about the primary first verified media target while still letting the facade stay backend-injection-friendly.
 
 ## 📋 Repository Details
 
 - **Type:** Video playback tool package
 - **License:** **Mozilla Public License 2.0 (MPL 2.0)**
-- **Current vendor status:** fake/test backend only in this first slice
-- **Future vendor direction:** Godot-native and other playback vendors should slot in behind the repo-owned backend interface rather than redefining the public contract
+- **Current vendor status:** deterministic fake backend by default; concrete vendors should be injected behind the shared core contract
+- **Future vendor direction:** Godot-native and other playback vendors should slot in behind the repo-owned facade rather than redefining the public contract
 
 ## GodotEnv development flow
 
@@ -65,7 +83,7 @@ From the repo root:
 godot --editor --path .testbed
 ```
 
-Use this `.testbed/` project as the canonical direct-development and bugfinding surface for contract and backend work.
+Use this `.testbed/` project as the canonical direct-development and bugfinding surface for facade and backend work.
 
 ### Import smoke check
 
@@ -89,6 +107,6 @@ godot --headless --path .testbed --script addons/gut/gut_cmdln.gd \
 ### Validation notes
 
 - `.testbed/addons.jsonc` is the committed dev/test dependency contract.
-- The current manifest remains intentionally narrow: `aerobeat-tool-core` plus `gut`.
-- The fake backend is the official deterministic proving surface for this first slice; real vendor integration is a follow-up.
-- Repo-local unit tests should prove the stable contract shell first, then expand as concrete vendor backends are added.
+- The manifest intentionally stays narrow: `aerobeat-tool-core` plus `gut`.
+- The fake backend remains the deterministic automated proving surface.
+- The hidden testbed also carries a real `.ogv` manual smoke asset so the repo proves the verified first media target without inventing a new fixture.

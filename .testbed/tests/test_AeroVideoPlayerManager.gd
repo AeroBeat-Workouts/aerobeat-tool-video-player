@@ -1,16 +1,17 @@
 extends GutTest
 
+const AeroVideoPlaybackContract := preload("res://addons/aerobeat-tool-core/globals/aero_video_playback_contract.gd")
 const FAKE_BACKEND_SCRIPT := preload("res://src/AeroVideoPlayerFakeBackend.gd")
 
-var _manager: AeroToolManager
+var _manager: AeroVideoPlayerManager
 
 func before_each() -> void:
-	_manager = AeroToolManager.new()
+	_manager = AeroVideoPlayerManager.new()
 	add_child_autofree(_manager)
 	_manager._initialize()
 
-func test_public_contract_shell_exposes_first_slice_surface() -> void:
-	assert_eq(AeroToolManager.VERSION, "0.1.0", "Version should reflect the first contract-shell slice")
+func test_public_facade_exposes_stable_video_player_surface() -> void:
+	assert_eq(AeroVideoPlayerManager.VERSION, "0.2.0", "Version should reflect the facade rename + core-contract slice")
 	assert_true(_manager.has_signal("state_changed"), "Public facade should expose state_changed")
 	assert_true(_manager.has_signal("position_changed"), "Public facade should expose position_changed")
 	assert_true(_manager.has_signal("media_loaded"), "Public facade should expose media_loaded")
@@ -32,21 +33,37 @@ func test_public_contract_shell_exposes_first_slice_surface() -> void:
 	assert_true(_manager.has_method("get_last_error"), "Public facade should expose get_last_error")
 	assert_true(_manager.get_backend() is RefCounted, "Manager should default to a backend instance")
 
-func test_normalize_source_applies_default_contract_values() -> void:
-	var normalized := _manager.normalize_source({
-		"path": " res://videos/example.ogv ",
+func test_manager_constants_match_shared_tool_core_contract() -> void:
+	assert_eq(AeroVideoPlayerManager.STATE_IDLE, AeroVideoPlaybackContract.STATE_IDLE, "idle state should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.STATE_LOADING, AeroVideoPlaybackContract.STATE_LOADING, "loading state should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.STATE_READY, AeroVideoPlaybackContract.STATE_READY, "ready state should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.STATE_PLAYING, AeroVideoPlaybackContract.STATE_PLAYING, "playing state should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.STATE_PAUSED, AeroVideoPlaybackContract.STATE_PAUSED, "paused state should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.STATE_STOPPING, AeroVideoPlaybackContract.STATE_STOPPING, "stopping state should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.STATE_ERROR, AeroVideoPlaybackContract.STATE_ERROR, "error state should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.ERROR_INVALID_SOURCE, AeroVideoPlaybackContract.ERROR_INVALID_SOURCE, "invalid_source should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.ERROR_INVALID_SURFACE, AeroVideoPlaybackContract.ERROR_INVALID_SURFACE, "invalid_surface should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.ERROR_BACKEND_REJECTED, AeroVideoPlaybackContract.ERROR_BACKEND_REJECTED, "backend_rejected should come from tool-core")
+	assert_eq(AeroVideoPlayerManager.ERROR_NOT_READY, AeroVideoPlaybackContract.ERROR_NOT_READY, "not_ready should come from tool-core")
+
+func test_normalize_source_delegates_to_shared_contract() -> void:
+	var source := {
+		"path": " res://assets/videos/calm_blue_sea_1.ogv ",
 		"autoplay": true,
 		"metadata": "not-a-dictionary",
-	})
-	assert_eq(String(normalized.get("path", "")), "res://videos/example.ogv", "normalize_source should trim path whitespace")
-	assert_eq(String(normalized.get("kind", "")), AeroToolManager.SOURCE_KIND_FILE, "normalize_source should default kind to file")
+	}
+	var normalized := _manager.normalize_source(source)
+	var shared := AeroVideoPlaybackContract.normalize_source(source)
+	assert_eq(normalized, shared, "manager normalization should match the shared tool-core contract exactly")
+	assert_eq(String(normalized.get("path", "")), "res://assets/videos/calm_blue_sea_1.ogv", "normalize_source should trim path whitespace")
+	assert_eq(String(normalized.get("kind", "")), AeroVideoPlayerManager.SOURCE_KIND_FILE, "normalize_source should default kind to file")
 	assert_false(bool(normalized.get("loop", true)), "normalize_source should default loop to false")
 	assert_true(bool(normalized.get("autoplay", false)), "normalize_source should preserve autoplay")
 	assert_eq(float(normalized.get("start_time", -1.0)), 0.0, "normalize_source should default start_time to zero")
 	assert_eq(float(normalized.get("rate", -1.0)), 1.0, "normalize_source should default rate to one")
 	assert_eq(normalized.get("metadata", {}), {}, "normalize_source should coerce non-dictionary metadata to an empty dictionary")
 
-func test_load_and_basic_transport_controls_use_fake_backend_contract() -> void:
+func test_load_and_basic_transport_controls_preserve_lifecycle_semantics() -> void:
 	var states: Array[String] = []
 	var loaded_payloads: Array[Dictionary] = []
 	var positions: Array[Array] = []
@@ -55,27 +72,27 @@ func test_load_and_basic_transport_controls_use_fake_backend_contract() -> void:
 	_manager.position_changed.connect(func(seconds: float, normalized: float): positions.append([seconds, normalized]))
 
 	_manager.load({
-		"path": "res://videos/example.ogv",
+		"path": "res://assets/videos/calm_blue_sea_1.ogv",
 		"duration_hint": 120.0,
 		"start_time": 12.5,
 		"rate": 1.5,
 	})
-	assert_eq(states.slice(0, 2), [AeroToolManager.STATE_LOADING, AeroToolManager.STATE_READY], "load should move through loading into ready")
+	assert_eq(states.slice(0, 2), [AeroVideoPlayerManager.STATE_LOADING, AeroVideoPlayerManager.STATE_READY], "load should move through loading into ready")
 	assert_eq(loaded_payloads.size(), 1, "load should emit one media_loaded payload")
-	assert_eq(String(loaded_payloads[0].get("path", "")), "res://videos/example.ogv", "media_loaded should expose the loaded path")
+	assert_eq(String(loaded_payloads[0].get("path", "")), "res://assets/videos/calm_blue_sea_1.ogv", "media_loaded should expose the loaded path")
 	assert_eq(float(loaded_payloads[0].get("duration", 0.0)), 120.0, "media_loaded should expose fake backend duration")
 	assert_eq(_manager.get_position(), 12.5, "load should honor start_time through seek")
 	assert_eq(_manager.get_duration(), 120.0, "get_duration should reflect fake backend media info")
 
 	_manager.play()
-	assert_eq(String(_manager.get_state().get("state", "")), AeroToolManager.STATE_PLAYING, "play should move the contract into playing")
+	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_PLAYING, "play should move the contract into playing")
 	_manager.pause()
-	assert_eq(String(_manager.get_state().get("state", "")), AeroToolManager.STATE_PAUSED, "pause should move the contract into paused")
+	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_PAUSED, "pause should move the contract into paused")
 	_manager.seek(60.0)
 	assert_eq(_manager.get_position(), 60.0, "seek should update the playback position")
 	assert_eq(positions.back(), [60.0, 0.5], "position_changed should emit normalized progress")
 	_manager.stop()
-	assert_eq(String(_manager.get_state().get("state", "")), AeroToolManager.STATE_READY, "stop should return the contract to ready when media remains loaded")
+	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_READY, "stop should return the contract to ready when media remains loaded")
 	assert_eq(_manager.get_position(), 0.0, "stop should reset position to zero")
 
 func test_attach_and_detach_surface_track_binding_contract() -> void:
@@ -97,9 +114,9 @@ func test_invalid_source_raises_contract_error_without_crashing() -> void:
 
 	_manager.load({"path": "", "kind": "file"})
 	assert_eq(errors.size(), 1, "Invalid load should raise one contract error")
-	assert_eq(String(errors[0].get("code", "")), AeroToolManager.ERROR_INVALID_SOURCE, "Invalid load should use the frozen invalid_source error code")
-	assert_eq(String(_manager.get_state().get("state", "")), AeroToolManager.STATE_ERROR, "Invalid load should transition into error")
-	assert_eq(String(_manager.get_last_error().get("code", "")), AeroToolManager.ERROR_INVALID_SOURCE, "Last error should retain the failure payload")
+	assert_eq(String(errors[0].get("code", "")), AeroVideoPlayerManager.ERROR_INVALID_SOURCE, "Invalid load should use the shared invalid_source error code")
+	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_ERROR, "Invalid load should transition into error")
+	assert_eq(String(_manager.get_last_error().get("code", "")), AeroVideoPlayerManager.ERROR_INVALID_SOURCE, "Last error should retain the failure payload")
 
 func test_fake_backend_can_be_swapped_explicitly_for_tests() -> void:
 	var backend := FAKE_BACKEND_SCRIPT.new()
