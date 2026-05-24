@@ -35,7 +35,7 @@ func test_plugin_cfg_describes_video_player_facade() -> void:
 		EXPECTED_PLUGIN_DESCRIPTION,
 		"plugin.cfg description should stay aligned with the renamed facade scope"
 	)
-	assert_eq(config.get_value("plugin", "version", ""), "0.2.0", "plugin version should reflect the renamed facade slice")
+	assert_eq(config.get_value("plugin", "version", ""), "0.3.0", "plugin version should reflect the lifecycle API expansion")
 
 func test_addons_manifest_keeps_expected_dependencies_only() -> void:
 	var manifest_text := _read_repo_file(ADDONS_MANIFEST_PATH)

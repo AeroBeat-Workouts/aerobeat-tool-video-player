@@ -19,6 +19,7 @@ The sharable package surface now centers on `src/AeroVideoPlayerManager.gd`.
 The current implementation exposes:
 
 - the frozen top-level playback states (`idle`, `loading`, `ready`, `playing`, `paused`, `stopping`, `error`)
+- dedicated shared lifecycle APIs for `reset()` (soft recovery/reuse) and `unload()` (hard teardown)
 - the playback signals (`state_changed`, `position_changed`, `media_loaded`, `playback_finished`, `error_raised`)
 - source normalization helpers for the current dictionary contract (`path`, `kind`, `loop`, `autoplay`, `start_time`, `rate`)
 - a backend injection boundary via `src/AeroVideoPlayerBackend.gd`

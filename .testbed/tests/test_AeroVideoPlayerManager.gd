@@ -11,7 +11,7 @@ func before_each() -> void:
 	_manager._initialize()
 
 func test_public_facade_exposes_stable_video_player_surface() -> void:
-	assert_eq(AeroVideoPlayerManager.VERSION, "0.2.0", "Version should reflect the facade rename + core-contract slice")
+	assert_eq(AeroVideoPlayerManager.VERSION, "0.3.0", "Version should reflect the lifecycle API expansion")
 	assert_true(_manager.has_signal("state_changed"), "Public facade should expose state_changed")
 	assert_true(_manager.has_signal("position_changed"), "Public facade should expose position_changed")
 	assert_true(_manager.has_signal("media_loaded"), "Public facade should expose media_loaded")
@@ -21,6 +21,8 @@ func test_public_facade_exposes_stable_video_player_surface() -> void:
 	assert_true(_manager.has_method("play"), "Public facade should expose play")
 	assert_true(_manager.has_method("pause"), "Public facade should expose pause")
 	assert_true(_manager.has_method("stop"), "Public facade should expose stop")
+	assert_true(_manager.has_method("reset"), "Public facade should expose reset")
+	assert_true(_manager.has_method("unload"), "Public facade should expose unload")
 	assert_true(_manager.has_method("seek"), "Public facade should expose seek")
 	assert_true(_manager.has_method("set_loop"), "Public facade should expose set_loop")
 	assert_true(_manager.has_method("set_rate"), "Public facade should expose set_rate")
@@ -107,6 +109,63 @@ func test_attach_and_detach_surface_track_binding_contract() -> void:
 	_manager.detach_surface()
 	var detached_state := _manager.get_state()
 	assert_false(bool(detached_state.get("surface_attached", true)), "detach_surface should clear the surface binding")
+
+func test_reset_clears_error_and_preserves_loaded_media_and_surface() -> void:
+	var output_surface := Node.new()
+	output_surface.name = "VideoSurface"
+	add_child_autofree(output_surface)
+	_manager.attach_surface(output_surface)
+	_manager.load({
+		"path": "res://assets/videos/calm_blue_sea_1.ogv",
+		"duration_hint": 120.0,
+	})
+	_manager.play()
+	_manager.seek(45.0)
+	_manager.load({"path": "", "kind": "file"})
+	assert_eq(String(_manager.get_last_error().get("code", "")), AeroVideoPlayerManager.ERROR_INVALID_SOURCE, "invalid load should seed last_error before reset")
+
+	_manager.reset()
+
+	var state := _manager.get_state()
+	assert_eq(String(state.get("state", "")), AeroVideoPlayerManager.STATE_READY, "reset should leave loaded media ready for reuse")
+	assert_eq(_manager.get_last_error(), {}, "reset should clear manager last_error")
+	assert_eq(float(_manager.get_position()), 0.0, "reset should seek playback back to zero")
+	assert_true(bool(state.get("surface_attached", false)), "reset should preserve the current surface attachment")
+	assert_eq(String(state.get("source", {}).get("path", "")), "res://assets/videos/calm_blue_sea_1.ogv", "reset should preserve the loaded source")
+	assert_eq(float(state.get("media_info", {}).get("duration", 0.0)), 120.0, "reset should preserve media info")
+
+	_manager.reset()
+	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_READY, "reset should be idempotent while media remains loaded")
+
+func test_unload_clears_loaded_media_and_forces_not_ready_behavior() -> void:
+	var output_surface := Node.new()
+	output_surface.name = "VideoSurface"
+	add_child_autofree(output_surface)
+	_manager.attach_surface(output_surface)
+	_manager.load({
+		"path": "res://assets/videos/calm_blue_sea_1.ogv",
+		"duration_hint": 120.0,
+	})
+	_manager.play()
+	_manager.load({"path": "", "kind": "file"})
+	assert_false(_manager.get_last_error().is_empty(), "invalid load should seed last_error before unload")
+
+	_manager.unload()
+
+	var state := _manager.get_state()
+	assert_eq(String(state.get("state", "")), AeroVideoPlayerManager.STATE_IDLE, "unload should leave the manager idle")
+	assert_eq(_manager.get_last_error(), {}, "unload should clear manager last_error")
+	assert_eq(state.get("source", {}), {}, "unload should clear the loaded source")
+	assert_eq(state.get("media_info", {}), {}, "unload should clear media info")
+	assert_false(bool(state.get("surface_attached", true)), "unload should detach any attached surface")
+	assert_eq(_manager.get_position(), 0.0, "unload should make position behave as not-ready")
+	assert_eq(_manager.get_duration(), 0.0, "unload should make duration behave as not-ready")
+
+	_manager.play()
+	assert_eq(String(_manager.get_last_error().get("code", "")), AeroVideoPlayerManager.ERROR_NOT_READY, "play after unload should behave as not-ready until a new load")
+
+	_manager.unload()
+	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_IDLE, "unload should be idempotent")
 
 func test_invalid_source_raises_contract_error_without_crashing() -> void:
 	var errors: Array[Dictionary] = []

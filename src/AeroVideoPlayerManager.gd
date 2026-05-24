@@ -30,7 +30,7 @@ enum PlaybackState {
 	ERROR,
 }
 
-const VERSION: String = "0.2.0"
+const VERSION: String = "0.3.0"
 const STATE_IDLE := AeroVideoPlaybackContract.STATE_IDLE
 const STATE_LOADING := AeroVideoPlaybackContract.STATE_LOADING
 const STATE_READY := AeroVideoPlaybackContract.STATE_READY
@@ -73,6 +73,7 @@ var _state_code: int = PlaybackState.IDLE
 var _loaded_source: Dictionary = {}
 var _media_info: Dictionary = {}
 var _last_error: Dictionary = {}
+var _has_loaded_media: bool = false
 var _surface: Node = null
 #endregion
 
@@ -130,6 +131,7 @@ func load(source: Dictionary) -> void:
 		return
 	_loaded_source = normalized.duplicate(true)
 	_media_info = _backend.get_media_info()
+	_has_loaded_media = true
 	_apply_result(_backend.set_loop(bool(_loaded_source.get("loop", false))), ERROR_BACKEND_REJECTED, "Backend rejected loop config.")
 	if _state_name == STATE_ERROR:
 		return
@@ -183,6 +185,36 @@ func stop() -> void:
 	_transition_state(PlaybackState.READY, {"source": _loaded_source.duplicate(true)})
 	_emit_position_changed(_backend.get_position(), _backend.get_duration())
 
+func reset() -> void:
+	_initialize()
+	var had_loaded_media := _has_loaded_media
+	_last_error = {}
+	if had_loaded_media:
+		_lifecycle_apply_result(_backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback during reset.")
+		_lifecycle_apply_result(_backend.seek(0.0), ERROR_BACKEND_REJECTED, "Backend failed to seek playback during reset.")
+		_last_error = {}
+		_transition_state(PlaybackState.READY, {
+			"source": _loaded_source.duplicate(true),
+			"media_info": _media_info.duplicate(true),
+		})
+		_emit_position_changed(get_position(), get_duration())
+		return
+	_transition_state(PlaybackState.IDLE)
+
+func unload() -> void:
+	_initialize()
+	if _has_loaded_media:
+		_lifecycle_apply_result(_backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback during unload.")
+	if _surface != null:
+		_lifecycle_apply_result(_backend.detach_surface(), ERROR_INVALID_SURFACE, "Backend failed to detach the output surface during unload.")
+	_surface = null
+	_loaded_source = {}
+	_media_info = {}
+	_last_error = {}
+	_has_loaded_media = false
+	_transition_state(PlaybackState.IDLE)
+	_emit_position_changed(0.0, 0.0)
+
 func seek(seconds: float) -> void:
 	_initialize()
 	if not _ensure_loaded("Cannot seek before media has been loaded."):
@@ -216,21 +248,26 @@ func get_state() -> Dictionary:
 		"state_code": _state_code,
 		"source": _loaded_source.duplicate(true),
 		"media_info": _media_info.duplicate(true),
-		"position": float(backend_state.get("position", 0.0)),
-		"duration": float(backend_state.get("duration", 0.0)),
+		"position": get_position(),
+		"duration": get_duration(),
 		"loop": bool(backend_state.get("loop", _loaded_source.get("loop", false))),
 		"rate": float(backend_state.get("rate", _loaded_source.get("rate", 1.0))),
 		"surface_attached": bool(backend_state.get("surface_attached", _surface != null)),
 		"backend": _backend_name,
 		"last_error": _last_error.duplicate(true),
+		"media_loaded": _has_loaded_media,
 	})
 
 func get_duration() -> float:
 	_initialize()
+	if not _has_loaded_media:
+		return 0.0
 	return _backend.get_duration() if _backend != null else 0.0
 
 func get_position() -> float:
 	_initialize()
+	if not _has_loaded_media:
+		return 0.0
 	return _backend.get_position() if _backend != null else 0.0
 
 func get_media_info() -> Dictionary:
@@ -269,7 +306,7 @@ func _validate_source(source: Dictionary) -> Dictionary:
 	return AeroVideoPlaybackContract.validate_source(source)
 
 func _ensure_loaded(message: String) -> bool:
-	if _loaded_source.is_empty():
+	if not _has_loaded_media:
 		_raise_error(ERROR_NOT_READY, message, {}, true)
 		return false
 	return true
@@ -286,6 +323,17 @@ func _emit_position_changed(seconds: float, duration: float) -> void:
 	if duration > 0.0:
 		normalized = clampf(seconds / duration, 0.0, 1.0)
 	position_changed.emit(seconds, normalized)
+
+func _lifecycle_apply_result(result: Dictionary, fallback_code: String, fallback_message: String) -> bool:
+	if bool(result.get(AeroVideoPlaybackContract.RESULT_SUCCESS, false)):
+		return true
+	_raise_error(
+		String(result.get(AeroVideoPlaybackContract.RESULT_CODE, fallback_code)),
+		String(result.get(AeroVideoPlaybackContract.RESULT_MESSAGE, fallback_message)),
+		result.get(AeroVideoPlaybackContract.RESULT_DETAIL, {}),
+		true
+	)
+	return false
 
 func _apply_result(result: Dictionary, fallback_code: String, fallback_message: String) -> void:
 	if bool(result.get(AeroVideoPlaybackContract.RESULT_SUCCESS, false)):
