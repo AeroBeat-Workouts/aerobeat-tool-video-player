@@ -7,8 +7,8 @@ class_name AeroVideoPlayerManager
 extends Node
 
 const AeroVideoPlaybackContract := preload("res://addons/aerobeat-tool-core/globals/aero_video_playback_contract.gd")
-const BackendInterfaceScript := preload("res://src/AeroVideoPlayerBackend.gd")
-const FakeBackendScript := preload("res://src/AeroVideoPlayerFakeBackend.gd")
+const BackendInterfaceScript := preload("AeroVideoPlayerBackend.gd")
+const FakeBackendScript := preload("AeroVideoPlayerFakeBackend.gd")
 
 #region SIGNALS
 signal initialized

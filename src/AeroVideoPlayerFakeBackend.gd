@@ -1,4 +1,4 @@
-extends "res://src/AeroVideoPlayerBackend.gd"
+extends "AeroVideoPlayerBackend.gd"
 
 const AeroVideoPlaybackContract := preload("res://addons/aerobeat-tool-core/globals/aero_video_playback_contract.gd")
 
