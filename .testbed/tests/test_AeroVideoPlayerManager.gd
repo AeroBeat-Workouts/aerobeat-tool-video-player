@@ -2,8 +2,15 @@ extends GutTest
 
 const AeroVideoPlaybackContract := preload("res://addons/aerobeat-tool-core/globals/aero_video_playback_contract.gd")
 const FAKE_BACKEND_SCRIPT := preload("res://src/AeroVideoPlayerFakeBackend.gd")
+const GODOT_BACKEND_SCRIPT := preload("res://addons/aerobeat-vendor-godot-video/src/AeroGodotVideoBackend.gd")
+const FAKE_VIDEO_STREAM_PLAYER_SCRIPT := preload("res://tests/helpers/FakeVideoStreamPlayer.gd")
+const SAMPLE_VIDEO_PATH := "res://assets/videos/calm_blue_sea_1.ogv"
+const SAMPLE_DURATION_SECONDS := 28.693313
 
 var _manager: AeroVideoPlayerManager
+
+func _make_fake_player() -> Node:
+	return FAKE_VIDEO_STREAM_PLAYER_SCRIPT.new()
 
 func before_each() -> void:
 	_manager = AeroVideoPlayerManager.new()
@@ -181,3 +188,35 @@ func test_fake_backend_can_be_swapped_explicitly_for_tests() -> void:
 	var backend := FAKE_BACKEND_SCRIPT.new()
 	_manager.set_backend(backend)
 	assert_same(_manager.get_backend(), backend, "set_backend should allow deterministic backend substitution for tests")
+
+func test_manager_can_be_injected_with_godot_vendor_backend_for_truthful_seek_path() -> void:
+	var manager := AeroVideoPlayerManager.new()
+	var backend := GODOT_BACKEND_SCRIPT.new()
+	backend.set_player_factory(Callable(self, "_make_fake_player"))
+	manager.set_backend(backend)
+	add_child_autofree(manager)
+	manager._initialize()
+
+	var surface := Node.new()
+	surface.name = "ManagedSurface"
+	add_child_autofree(surface)
+	manager.attach_surface(surface)
+	manager.load({
+		"path": SAMPLE_VIDEO_PATH,
+		"duration_hint": SAMPLE_DURATION_SECONDS,
+		"start_time": 3.25,
+		"metadata": {
+			"real_sample": true,
+			"source": "tool_repo_testbed",
+		},
+	})
+
+	assert_eq(str(manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_READY, "Injected vendor backend should still drive the stable manager into ready")
+	assert_eq(str(manager.get_state().get("backend", "")), "AeroGodotVideoBackend", "Manager should report the injected real backend name")
+	assert_eq(str(manager.get_media_info().get("vendor", "")), "godot_video", "Media info should expose the Godot vendor when injected")
+	assert_eq(float(manager.get_duration()), SAMPLE_DURATION_SECONDS, "Truthful proving path should use the real sample duration hint")
+	assert_eq(float(manager.get_position()), 3.25, "Injected backend should honor start_time via seek")
+
+	manager.seek(17.5)
+	assert_eq(float(manager.get_position()), 17.5, "Stable manager seek should flow through the injected vendor backend")
+	assert_eq(float(manager.get_state().get("position", 0.0)), 17.5, "State snapshot should expose the injected backend seek position")

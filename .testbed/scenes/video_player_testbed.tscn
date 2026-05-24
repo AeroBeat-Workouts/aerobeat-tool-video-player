@@ -36,10 +36,59 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "res://assets/videos/calm_blue_sea_1.ogv"
 
+[node name="BackendLabel" type="Label" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Backend: pending"
+
 [node name="StatusLabel" type="Label" parent="MarginContainer/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "State: idle"
+
+[node name="PlaybackLabel" type="Label" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Playback: idle"
+
+[node name="Metrics" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="PositionLabel" type="Label" parent="MarginContainer/VBox/Metrics"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Position: 00:00.00"
+
+[node name="DurationLabel" type="Label" parent="MarginContainer/VBox/Metrics"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Duration: 00:00.00"
+
+[node name="SeekRow" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SeekBackButton" type="Button" parent="MarginContainer/VBox/SeekRow"]
+layout_mode = 2
+text = "-5s"
+
+[node name="SeekSlider" type="HSlider" parent="MarginContainer/VBox/SeekRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(640, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+
+[node name="SeekForwardButton" type="Button" parent="MarginContainer/VBox/SeekRow"]
+layout_mode = 2
+text = "+5s"
+
+[node name="SeekValueLabel" type="Label" parent="MarginContainer/VBox/SeekRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "00:00.00"
 
 [node name="Surface" type="ColorRect" parent="MarginContainer/VBox"]
 unique_name_in_owner = true
@@ -67,6 +116,10 @@ text = "Pause"
 layout_mode = 2
 text = "Stop"
 
+[connection signal="pressed" from="MarginContainer/VBox/SeekRow/SeekBackButton" to="." method="_on_seek_back_button_pressed"]
+[connection signal="value_changed" from="MarginContainer/VBox/SeekRow/SeekSlider" to="." method="_on_seek_slider_value_changed"]
+[connection signal="drag_ended" from="MarginContainer/VBox/SeekRow/SeekSlider" to="." method="_on_seek_slider_drag_ended"]
+[connection signal="pressed" from="MarginContainer/VBox/SeekRow/SeekForwardButton" to="." method="_on_seek_forward_button_pressed"]
 [connection signal="pressed" from="MarginContainer/VBox/Buttons/LoadButton" to="." method="_on_load_button_pressed"]
 [connection signal="pressed" from="MarginContainer/VBox/Buttons/PlayButton" to="." method="_on_play_button_pressed"]
 [connection signal="pressed" from="MarginContainer/VBox/Buttons/PauseButton" to="." method="_on_pause_button_pressed"]

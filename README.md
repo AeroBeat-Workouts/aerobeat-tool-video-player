@@ -37,8 +37,9 @@ The current implementation exposes:
 The hidden `.testbed/` workbench now includes a real `.ogv` proving surface.
 
 - `.testbed/assets/videos/calm_blue_sea_1.ogv` reuses the proven environment-lane sample.
-- `.testbed/scenes/video_player_testbed.tscn` provides a repo-local manual smoke scene.
-- `.testbed/scripts/video_player_testbed.gd` wires the public facade into that scene using the real sample path.
+- `.testbed/scenes/video_player_testbed.tscn` provides a repo-local manual smoke scene with load / play / pause / stop / seek controls.
+- `.testbed/scripts/video_player_testbed.gd` wires the stable public facade into that scene through direct injection of the real `aerobeat-vendor-godot-video` backend, so manual proving follows the real backend path instead of the default fake backend.
+- The proving HUD displays the live manager position plus the truthful sample duration hint (`28.693313s`, measured from the shipped `.ogv`) so humans can verify seek behavior against the real clip.
 
 This keeps the repo honest about the primary first verified media target while still letting the facade stay backend-injection-friendly.
 
@@ -108,6 +109,7 @@ godot --headless --path .testbed --script addons/gut/gut_cmdln.gd \
 ### Validation notes
 
 - `.testbed/addons.jsonc` is the committed dev/test dependency contract.
-- The manifest intentionally stays narrow: `aerobeat-tool-core` plus `gut`.
-- The fake backend remains the deterministic automated proving surface.
+- The manifest intentionally stays narrow: `aerobeat-tool-core`, `aerobeat-vendor-godot-video`, and `gut`.
+- The fake backend remains the deterministic automated unit-test default for the public facade.
+- The hidden manual proving scene now injects the real Godot vendor backend so load / play / pause / stop / seek verification does not silently fall back to the fake backend.
 - The hidden testbed also carries a real `.ogv` manual smoke asset so the repo proves the verified first media target without inventing a new fixture.

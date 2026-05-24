@@ -18,6 +18,9 @@ Thumbs.db
 # GodotEnv package workbench
 .testbed/addons/*
 !.testbed/addons/.editorconfig
+!.testbed/addons/aerobeat-tool-video-player/
+!.testbed/addons/aerobeat-tool-video-player/src/
+!.testbed/addons/aerobeat-tool-video-player/src/*.gd
 .testbed/.addons/
 
 # Beads / Dolt files (added by bd init)
