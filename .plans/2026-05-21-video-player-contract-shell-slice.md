@@ -78,9 +78,21 @@ Use these reference IDs in implementation notes, QA evidence, and audit findings
 **Files Created/Deleted/Modified:**
 - Whatever Task 1 changed; QA should cite exact touched files in its evidence.
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Blocked on coder completion.
+**Results:** QA passed on commit `c635c34` with plan/status context at `b86adba`. Independent repo-local verification rechecked the contract slice against `REF-01`, `REF-02`, `REF-03`, `REF-04`, and `REF-06`. Exact validation evidence:
+- `git diff-tree --no-commit-id --name-only -r c635c34` showed only plan/docs/tests/README/plugin/src paths; no `/addons/` mirrors were edited.
+- `godot --headless --path .testbed --import` exited `0` on Godot `4.6.2` (one non-blocking `ObjectDB instances leaked at exit` warning during headless editor shutdown).
+- `godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit` passed `9/9` tests with `64` asserts.
+- Additional direct probe via temporary headless script confirmed `can_load_source(true/false)` behavior plus `load`, `attach_surface`, `seek`, and `detach_surface` against the fake backend, yielding `{"backend":"AeroVideoPlayerFakeBackend","duration":90.0,"initial_can_load":true,"invalid_can_load":false,"loop":true,"position":30.0,"rate":1.25,"state":"ready","surface_attached":false}`.
+
+Contract/repo-convention findings:
+- Singleton shell, state/error/signal vocabulary, config normalization helpers, backend interface, fake backend, and output-surface binding contract all exist and behaved as intended for this first slice.
+- Sharable code stayed at repo root (`src/*.gd`, `plugin.cfg`, `README.md`), while `.testbed/` remained the proving surface.
+- No `/addons/` mirror was treated as owned source.
+- Replay/tool-camera-tracking boundary remained intact in README/plan language and in the public contract shape: this repo owns playback lifecycle/time/surface semantics; camera-tracking remains a consumer rather than a duplicate owner.
+
+Gap note: current tests verify `set_loop` / `set_rate` presence indirectly through load/state behavior, but they do not yet assert standalone post-call `get_state()` semantics. Not a blocker for this slice.
 
 ---
 
@@ -132,6 +144,7 @@ This creates a strict repo-local `coder → QA → auditor` chain.
 - Implemented the repo-root `AeroToolManager` contract shell with the first stable playback state/error/signal vocabulary.
 - Added the backend boundary (`src/AeroVideoPlayerBackend.gd`) and deterministic fake backend (`src/AeroVideoPlayerFakeBackend.gd`) so later vendor playback work can stay behind a contract.
 - Replaced template-only `.testbed` coverage with contract-shell tests and refreshed README/plugin metadata to describe the real package surface.
+- Completed independent QA: `.testbed` import/test validation passed, scope stayed out of `/addons/`, sharable code remained at repo root, and the replay/tool-camera-tracking ownership boundary stayed intact.
 
 **Reference Check:**
 - `REF-01` repo and `.testbed` conventions were followed.
