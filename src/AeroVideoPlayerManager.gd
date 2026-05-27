@@ -17,6 +17,11 @@ signal position_changed(seconds: float, normalized: float)
 signal media_loaded(info: Dictionary)
 signal playback_finished
 signal error_raised(error_info: Dictionary)
+signal slot_state_changed(slot_name: String, state: String, detail: Dictionary)
+signal slot_position_changed(slot_name: String, seconds: float, normalized: float)
+signal slot_media_loaded(slot_name: String, info: Dictionary)
+signal slot_playback_finished(slot_name: String)
+signal slot_error_raised(slot_name: String, error_info: Dictionary)
 #endregion
 
 #region ENUMS & CONSTANTS
@@ -30,7 +35,8 @@ enum PlaybackState {
 	ERROR,
 }
 
-const VERSION: String = "0.3.0"
+const VERSION: String = "0.4.0"
+const DEFAULT_SLOT := "primary"
 const STATE_IDLE := AeroVideoPlaybackContract.STATE_IDLE
 const STATE_LOADING := AeroVideoPlaybackContract.STATE_LOADING
 const STATE_READY := AeroVideoPlaybackContract.STATE_READY
@@ -66,15 +72,9 @@ const ERROR_NOT_READY := AeroVideoPlaybackContract.ERROR_NOT_READY
 
 #region PRIVATE VARIABLES
 var _is_initialized: bool = false
-var _backend: AeroVideoPlayerBackend
-var _backend_name: String = ""
-var _state_name: String = STATE_IDLE
-var _state_code: int = PlaybackState.IDLE
-var _loaded_source: Dictionary = {}
-var _media_info: Dictionary = {}
-var _last_error: Dictionary = {}
-var _has_loaded_media: bool = false
-var _surface: Node = null
+var _backend_factory: Callable = Callable()
+var _active_slot: String = DEFAULT_SLOT
+var _slots: Dictionary = {}
 #endregion
 
 #region LIFECYCLE
@@ -84,250 +84,382 @@ func _ready() -> void:
 func _initialize() -> void:
 	if _is_initialized:
 		return
-	if _backend == null:
-		set_backend(FakeBackendScript.new())
+	_ensure_slot(DEFAULT_SLOT)
 	_is_initialized = true
 	initialized.emit()
 #endregion
 
 #region PUBLIC API
-func set_backend(backend: AeroVideoPlayerBackend) -> void:
-	if backend == null:
-		backend = FakeBackendScript.new()
-	_backend = backend
-	_backend_name = backend.get_script().resource_path.get_file().trim_suffix(".gd") if backend.get_script() != null else "custom_backend"
-	if _surface != null and _backend.has_method("attach_surface"):
-		_backend.attach_surface(_surface)
-
-func get_backend() -> AeroVideoPlayerBackend:
+func set_backend(backend: AeroVideoPlayerBackend, slot_name: String = DEFAULT_SLOT) -> void:
 	_initialize()
-	return _backend
+	var resolved_slot := _resolve_slot_name(slot_name)
+	if backend == null:
+		backend = create_default_backend()
+	var session := _ensure_slot(resolved_slot)
+	session["backend"] = backend
+	session["backend_name"] = _resolve_backend_name(backend)
+	_slots[resolved_slot] = session
+	var surface: Node = session.get("surface", null)
+	if surface != null and backend.has_method("attach_surface"):
+		backend.attach_surface(surface)
+
+func set_backend_factory(factory: Callable) -> void:
+	_backend_factory = factory
+
+func get_backend(slot_name: String = DEFAULT_SLOT) -> AeroVideoPlayerBackend:
+	_initialize()
+	var session := _ensure_slot(slot_name)
+	return session.get("backend", null)
 
 func create_default_backend() -> AeroVideoPlayerBackend:
+	if _backend_factory.is_valid():
+		var created: Variant = _backend_factory.call()
+		if created is AeroVideoPlayerBackend:
+			return created
 	return FakeBackendScript.new()
 
 func get_default_source_config() -> Dictionary:
-	return AeroVideoPlaybackContract.get_default_source_config()
+	var config := AeroVideoPlaybackContract.get_default_source_config()
+	config["slot"] = DEFAULT_SLOT
+	return config
 
 func normalize_source(source: Dictionary) -> Dictionary:
-	return AeroVideoPlaybackContract.normalize_source(source)
+	var normalized := AeroVideoPlaybackContract.normalize_source(source)
+	normalized["slot"] = _resolve_slot_from_source(source)
+	return normalized
 
 func can_load_source(source: Dictionary) -> bool:
 	return _validate_source(normalize_source(source)).is_empty()
 
-func load(source: Dictionary) -> void:
+func set_active_slot(slot_name: String) -> Dictionary:
 	_initialize()
+	_active_slot = _normalize_slot_name(slot_name)
+	_ensure_slot(_active_slot)
+	return {"slot": _active_slot}
+
+func get_active_slot() -> String:
+	_initialize()
+	return _active_slot
+
+func get_slot_names() -> PackedStringArray:
+	_initialize()
+	var slot_names: Array[String] = []
+	for slot_name in _slots.keys():
+		slot_names.append(str(slot_name))
+	slot_names.sort()
+	return PackedStringArray(slot_names)
+
+func attach_slot_surface(slot_name: String, node: Node) -> void:
+	attach_surface(node, slot_name)
+
+func detach_slot_surface(slot_name: String = "") -> void:
+	detach_surface(slot_name)
+
+func load(source: Dictionary, slot_name: String = "") -> void:
+	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name, source)
 	if not is_active:
-		_raise_error(ERROR_NOT_READY, "AeroVideoPlayerManager is inactive.", {"source": source.duplicate(true)}, true)
+		_raise_error_for_slot(resolved_slot, ERROR_NOT_READY, "AeroVideoPlayerManager is inactive.", {"source": source.duplicate(true)}, true)
 		return
-	var normalized := normalize_source(source)
+	var session := _ensure_slot(resolved_slot)
+	var normalized := normalize_source(_prepare_source_for_slot(source, resolved_slot))
 	var validation_error := _validate_source(normalized)
 	if not validation_error.is_empty():
-		_raise_error(ERROR_INVALID_SOURCE, validation_error.get("message", "Invalid video source."), validation_error, true)
+		_raise_error_for_slot(resolved_slot, ERROR_INVALID_SOURCE, validation_error.get("message", "Invalid video source."), validation_error, true)
 		return
-	_transition_state(PlaybackState.LOADING, {"source": normalized.duplicate(true)})
-	_apply_result(_backend.load(normalized), ERROR_BACKEND_REJECTED, "Backend failed to load media.")
-	if _state_name == STATE_ERROR:
+	_transition_state_for_slot(resolved_slot, PlaybackState.LOADING, {"source": normalized.duplicate(true)})
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.load(normalized), ERROR_BACKEND_REJECTED, "Backend failed to load media.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	_loaded_source = normalized.duplicate(true)
-	_media_info = _backend.get_media_info()
-	_has_loaded_media = true
-	_apply_result(_backend.set_loop(bool(_loaded_source.get("loop", false))), ERROR_BACKEND_REJECTED, "Backend rejected loop config.")
-	if _state_name == STATE_ERROR:
+	session["loaded_source"] = normalized.duplicate(true)
+	session["media_info"] = backend.get_media_info()
+	session["has_loaded_media"] = true
+	session["last_error"] = {}
+	_slots[resolved_slot] = session
+	_apply_result_for_slot(resolved_slot, backend.set_loop(bool(normalized.get("loop", false))), ERROR_BACKEND_REJECTED, "Backend rejected loop config.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	_apply_result(_backend.set_rate(float(_loaded_source.get("rate", 1.0))), ERROR_BACKEND_REJECTED, "Backend rejected playback rate.")
-	if _state_name == STATE_ERROR:
+	_apply_result_for_slot(resolved_slot, backend.set_rate(float(normalized.get("rate", 1.0))), ERROR_BACKEND_REJECTED, "Backend rejected playback rate.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	if _surface != null:
-		_apply_result(_backend.attach_surface(_surface), ERROR_INVALID_SURFACE, "Backend rejected the output surface.")
-		if _state_name == STATE_ERROR:
+	var surface: Node = session.get("surface", null)
+	if surface != null:
+		_apply_result_for_slot(resolved_slot, backend.attach_surface(surface), ERROR_INVALID_SURFACE, "Backend rejected the output surface.")
+		if _slot_state_name(resolved_slot) == STATE_ERROR:
 			return
-	_transition_state(PlaybackState.READY, {
-		"source": _loaded_source.duplicate(true),
-		"media_info": _media_info.duplicate(true),
+	_transition_state_for_slot(resolved_slot, PlaybackState.READY, {
+		"source": session.get("loaded_source", {}).duplicate(true),
+		"media_info": session.get("media_info", {}).duplicate(true),
 	})
-	media_loaded.emit(_media_info.duplicate(true))
-	if float(_loaded_source.get("start_time", 0.0)) > 0.0:
-		seek(float(_loaded_source.get("start_time", 0.0)))
-	if bool(_loaded_source.get("autoplay", false)):
-		play()
+	var loaded_info: Dictionary = session.get("media_info", {}).duplicate(true)
+	loaded_info["slot"] = resolved_slot
+	if resolved_slot == _active_slot:
+		media_loaded.emit(loaded_info.duplicate(true))
+	slot_media_loaded.emit(resolved_slot, loaded_info.duplicate(true))
+	if float(normalized.get("start_time", 0.0)) > 0.0:
+		seek(float(normalized.get("start_time", 0.0)), resolved_slot)
 	else:
-		_emit_position_changed(_backend.get_position(), _backend.get_duration())
+		_emit_position_changed_for_slot(resolved_slot, backend.get_position(), backend.get_duration())
+	if bool(normalized.get("autoplay", false)):
+		play(resolved_slot)
 
-func play() -> void:
+func play(slot_name: String = "") -> void:
 	_initialize()
-	if not _ensure_loaded("Cannot play before media has been loaded."):
+	var resolved_slot := _resolve_slot_name(slot_name)
+	if not _ensure_loaded_for_slot(resolved_slot, "Cannot play before media has been loaded."):
 		return
-	if _state_name == STATE_PLAYING:
+	if _slot_state_name(resolved_slot) == STATE_PLAYING:
 		return
-	_apply_result(_backend.play(), ERROR_BACKEND_REJECTED, "Backend failed to start playback.")
-	if _state_name == STATE_ERROR:
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.play(), ERROR_BACKEND_REJECTED, "Backend failed to start playback.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	_transition_state(PlaybackState.PLAYING, {"source": _loaded_source.duplicate(true)})
+	_transition_state_for_slot(resolved_slot, PlaybackState.PLAYING, {"source": session.get("loaded_source", {}).duplicate(true)})
 
-func pause() -> void:
+func pause(slot_name: String = "") -> void:
 	_initialize()
-	if not _ensure_loaded("Cannot pause before media has been loaded."):
+	var resolved_slot := _resolve_slot_name(slot_name)
+	if not _ensure_loaded_for_slot(resolved_slot, "Cannot pause before media has been loaded."):
 		return
-	_apply_result(_backend.pause(), ERROR_BACKEND_REJECTED, "Backend failed to pause playback.")
-	if _state_name == STATE_ERROR:
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.pause(), ERROR_BACKEND_REJECTED, "Backend failed to pause playback.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	_transition_state(PlaybackState.PAUSED, {"source": _loaded_source.duplicate(true)})
+	_transition_state_for_slot(resolved_slot, PlaybackState.PAUSED, {"source": session.get("loaded_source", {}).duplicate(true)})
+	_emit_position_changed_for_slot(resolved_slot, backend.get_position(), backend.get_duration())
 
-func stop() -> void:
+func stop(slot_name: String = "") -> void:
 	_initialize()
-	if not _ensure_loaded("Cannot stop before media has been loaded."):
+	var resolved_slot := _resolve_slot_name(slot_name)
+	if not _ensure_loaded_for_slot(resolved_slot, "Cannot stop before media has been loaded."):
 		return
-	_transition_state(PlaybackState.STOPPING, {"source": _loaded_source.duplicate(true)})
-	_apply_result(_backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback.")
-	if _state_name == STATE_ERROR:
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_transition_state_for_slot(resolved_slot, PlaybackState.STOPPING, {"source": session.get("loaded_source", {}).duplicate(true)})
+	_apply_result_for_slot(resolved_slot, backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	_transition_state(PlaybackState.READY, {"source": _loaded_source.duplicate(true)})
-	_emit_position_changed(_backend.get_position(), _backend.get_duration())
+	_transition_state_for_slot(resolved_slot, PlaybackState.READY, {"source": session.get("loaded_source", {}).duplicate(true)})
+	_emit_position_changed_for_slot(resolved_slot, backend.get_position(), backend.get_duration())
 
-func reset() -> void:
+func reset(slot_name: String = "") -> void:
 	_initialize()
-	var had_loaded_media := _has_loaded_media
-	_last_error = {}
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var had_loaded_media := bool(session.get("has_loaded_media", false))
+	session["last_error"] = {}
+	_slots[resolved_slot] = session
 	if had_loaded_media:
-		_lifecycle_apply_result(_backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback during reset.")
-		_lifecycle_apply_result(_backend.seek(0.0), ERROR_BACKEND_REJECTED, "Backend failed to seek playback during reset.")
-		_last_error = {}
-		_transition_state(PlaybackState.READY, {
-			"source": _loaded_source.duplicate(true),
-			"media_info": _media_info.duplicate(true),
+		var backend: AeroVideoPlayerBackend = session.get("backend", null)
+		_lifecycle_apply_result_for_slot(resolved_slot, backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback during reset.")
+		_lifecycle_apply_result_for_slot(resolved_slot, backend.seek(0.0), ERROR_BACKEND_REJECTED, "Backend failed to seek playback during reset.")
+		session = _ensure_slot(resolved_slot)
+		session["last_error"] = {}
+		_slots[resolved_slot] = session
+		_transition_state_for_slot(resolved_slot, PlaybackState.READY, {
+			"source": session.get("loaded_source", {}).duplicate(true),
+			"media_info": session.get("media_info", {}).duplicate(true),
 		})
-		_emit_position_changed(get_position(), get_duration())
+		_emit_position_changed_for_slot(resolved_slot, get_position(resolved_slot), get_duration(resolved_slot))
 		return
-	_transition_state(PlaybackState.IDLE)
+	_transition_state_for_slot(resolved_slot, PlaybackState.IDLE)
 
-func unload() -> void:
+func unload(slot_name: String = "") -> void:
 	_initialize()
-	if _has_loaded_media:
-		_lifecycle_apply_result(_backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback during unload.")
-	if _surface != null:
-		_lifecycle_apply_result(_backend.detach_surface(), ERROR_INVALID_SURFACE, "Backend failed to detach the output surface during unload.")
-	_surface = null
-	_loaded_source = {}
-	_media_info = {}
-	_last_error = {}
-	_has_loaded_media = false
-	_transition_state(PlaybackState.IDLE)
-	_emit_position_changed(0.0, 0.0)
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	if bool(session.get("has_loaded_media", false)):
+		_lifecycle_apply_result_for_slot(resolved_slot, backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback during unload.")
+	if session.get("surface", null) != null:
+		_lifecycle_apply_result_for_slot(resolved_slot, backend.detach_surface(), ERROR_INVALID_SURFACE, "Backend failed to detach the output surface during unload.")
+	session["surface"] = null
+	session["loaded_source"] = {}
+	session["media_info"] = {}
+	session["last_error"] = {}
+	session["has_loaded_media"] = false
+	_slots[resolved_slot] = session
+	_transition_state_for_slot(resolved_slot, PlaybackState.IDLE)
+	_emit_position_changed_for_slot(resolved_slot, 0.0, 0.0)
 
-func seek(seconds: float) -> void:
+func seek(seconds: float, slot_name: String = "") -> void:
 	_initialize()
-	if not _ensure_loaded("Cannot seek before media has been loaded."):
+	var resolved_slot := _resolve_slot_name(slot_name)
+	if not _ensure_loaded_for_slot(resolved_slot, "Cannot seek before media has been loaded."):
 		return
-	_apply_result(_backend.seek(seconds), ERROR_BACKEND_REJECTED, "Backend failed to seek playback.")
-	if _state_name == STATE_ERROR:
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.seek(seconds), ERROR_BACKEND_REJECTED, "Backend failed to seek playback.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	_emit_position_changed(_backend.get_position(), _backend.get_duration())
-	if _backend.get_duration() > 0.0 and _backend.get_position() >= _backend.get_duration() and not bool(_loaded_source.get("loop", false)):
-		playback_finished.emit()
+	_emit_position_changed_for_slot(resolved_slot, backend.get_position(), backend.get_duration())
+	if backend.get_duration() > 0.0 and backend.get_position() >= backend.get_duration() and not bool(get_state(resolved_slot).get("loop", false)):
+		_emit_playback_finished_for_slot(resolved_slot)
 
-func set_loop(enabled: bool) -> void:
+func set_loop(enabled: bool, slot_name: String = "") -> void:
 	_initialize()
-	if _loaded_source.is_empty():
-		_loaded_source = get_default_source_config()
-	_loaded_source["loop"] = enabled
-	_apply_result(_backend.set_loop(enabled), ERROR_BACKEND_REJECTED, "Backend failed to update loop mode.")
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var source: Dictionary = session.get("loaded_source", {}).duplicate(true)
+	if source.is_empty():
+		source = get_default_source_config()
+		source["slot"] = resolved_slot
+	source["loop"] = enabled
+	session["loaded_source"] = source
+	_slots[resolved_slot] = session
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.set_loop(enabled), ERROR_BACKEND_REJECTED, "Backend failed to update loop mode.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
+		return
+	_state_changed_for_slot(resolved_slot, get_state(resolved_slot))
 
-func set_rate(rate: float) -> void:
+func set_rate(rate: float, slot_name: String = "") -> void:
 	_initialize()
-	if _loaded_source.is_empty():
-		_loaded_source = get_default_source_config()
-	_loaded_source["rate"] = rate
-	_apply_result(_backend.set_rate(rate), ERROR_BACKEND_REJECTED, "Backend failed to update playback rate.")
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var source: Dictionary = session.get("loaded_source", {}).duplicate(true)
+	if source.is_empty():
+		source = get_default_source_config()
+		source["slot"] = resolved_slot
+	source["rate"] = rate
+	session["loaded_source"] = source
+	_slots[resolved_slot] = session
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.set_rate(rate), ERROR_BACKEND_REJECTED, "Backend failed to update playback rate.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
+		return
+	_state_changed_for_slot(resolved_slot, get_state(resolved_slot))
 
-func get_state() -> Dictionary:
+func get_state(slot_name: String = "") -> Dictionary:
 	_initialize()
-	var backend_state: Dictionary = _backend.get_state() if _backend != null else {}
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	var backend_state: Dictionary = backend.get_state() if backend != null else {}
 	return AeroVideoPlaybackContract.build_state_snapshot({
-		"state": _state_name,
-		"state_code": _state_code,
-		"source": _loaded_source.duplicate(true),
-		"media_info": _media_info.duplicate(true),
-		"position": get_position(),
-		"duration": get_duration(),
-		"loop": bool(backend_state.get("loop", _loaded_source.get("loop", false))),
-		"rate": float(backend_state.get("rate", _loaded_source.get("rate", 1.0))),
-		"surface_attached": bool(backend_state.get("surface_attached", _surface != null)),
-		"backend": _backend_name,
-		"last_error": _last_error.duplicate(true),
-		"media_loaded": _has_loaded_media,
+		"slot": resolved_slot,
+		"active_slot": _active_slot,
+		"slot_names": get_slot_names(),
+		"state": _slot_state_name(resolved_slot),
+		"state_code": int(session.get("state_code", PlaybackState.IDLE)),
+		"source": session.get("loaded_source", {}).duplicate(true),
+		"media_info": session.get("media_info", {}).duplicate(true),
+		"position": get_position(resolved_slot),
+		"duration": get_duration(resolved_slot),
+		"loop": bool(backend_state.get("loop", session.get("loaded_source", {}).get("loop", false))),
+		"rate": float(backend_state.get("rate", session.get("loaded_source", {}).get("rate", 1.0))),
+		"surface_attached": bool(backend_state.get("surface_attached", session.get("surface", null) != null)),
+		"backend": str(session.get("backend_name", "")),
+		"last_error": session.get("last_error", {}).duplicate(true),
+		"media_loaded": bool(session.get("has_loaded_media", false)),
 	})
 
-func get_duration() -> float:
+func get_slot_state(slot_name: String) -> Dictionary:
+	return get_state(slot_name)
+
+func get_duration(slot_name: String = "") -> float:
 	_initialize()
-	if not _has_loaded_media:
+	var session := _ensure_slot(_resolve_slot_name(slot_name))
+	if not bool(session.get("has_loaded_media", false)):
 		return 0.0
-	return _backend.get_duration() if _backend != null else 0.0
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	return backend.get_duration() if backend != null else 0.0
 
-func get_position() -> float:
+func get_position(slot_name: String = "") -> float:
 	_initialize()
-	if not _has_loaded_media:
+	var session := _ensure_slot(_resolve_slot_name(slot_name))
+	if not bool(session.get("has_loaded_media", false)):
 		return 0.0
-	return _backend.get_position() if _backend != null else 0.0
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	return backend.get_position() if backend != null else 0.0
 
-func get_media_info() -> Dictionary:
+func get_media_info(slot_name: String = "") -> Dictionary:
 	_initialize()
-	return _media_info.duplicate(true)
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var info: Dictionary = session.get("media_info", {}).duplicate(true)
+	info["slot"] = resolved_slot
+	return info
 
-func attach_surface(node: Node) -> void:
+func attach_surface(node: Node, slot_name: String = "") -> void:
 	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name)
 	if node == null:
-		_raise_error(ERROR_INVALID_SURFACE, "Cannot attach a null output surface.", {}, true)
+		_raise_error_for_slot(resolved_slot, ERROR_INVALID_SURFACE, "Cannot attach a null output surface.", {}, true)
 		return
-	_surface = node
-	_apply_result(_backend.attach_surface(node), ERROR_INVALID_SURFACE, "Backend rejected the output surface.")
-	if _state_name == STATE_ERROR:
+	var session := _ensure_slot(resolved_slot)
+	session["surface"] = node
+	_slots[resolved_slot] = session
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.attach_surface(node), ERROR_INVALID_SURFACE, "Backend rejected the output surface.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	var detail := get_state()
+	var detail := get_state(resolved_slot)
 	detail["surface_path"] = str(node.get_path()) if node.is_inside_tree() else node.name
-	state_changed.emit(_state_name, detail)
+	_state_changed_for_slot(resolved_slot, detail)
 
-func detach_surface() -> void:
+func detach_surface(slot_name: String = "") -> void:
 	_initialize()
-	_surface = null
-	_apply_result(_backend.detach_surface(), ERROR_INVALID_SURFACE, "Backend failed to detach the output surface.")
-	if _state_name == STATE_ERROR:
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	session["surface"] = null
+	_slots[resolved_slot] = session
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	_apply_result_for_slot(resolved_slot, backend.detach_surface(), ERROR_INVALID_SURFACE, "Backend failed to detach the output surface.")
+	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
-	var detail := get_state()
+	var detail := get_state(resolved_slot)
 	detail["surface_path"] = ""
-	state_changed.emit(_state_name, detail)
+	_state_changed_for_slot(resolved_slot, detail)
 
-func get_last_error() -> Dictionary:
-	return _last_error.duplicate(true)
+func get_last_error(slot_name: String = "") -> Dictionary:
+	var session := _ensure_slot(_resolve_slot_name(slot_name))
+	return session.get("last_error", {}).duplicate(true)
 #endregion
 
 #region PRIVATE HELPERS
 func _validate_source(source: Dictionary) -> Dictionary:
 	return AeroVideoPlaybackContract.validate_source(source)
 
-func _ensure_loaded(message: String) -> bool:
-	if not _has_loaded_media:
-		_raise_error(ERROR_NOT_READY, message, {}, true)
+func _ensure_loaded_for_slot(slot_name: String, message: String) -> bool:
+	var session := _ensure_slot(slot_name)
+	if not bool(session.get("has_loaded_media", false)):
+		_raise_error_for_slot(slot_name, ERROR_NOT_READY, message, {}, true)
 		return false
 	return true
 
-func _transition_state(state_code: int, detail: Dictionary = {}) -> void:
-	_state_code = state_code
-	_state_name = STATE_NAMES.get(state_code, STATE_IDLE)
+func _transition_state_for_slot(slot_name: String, state_code: int, detail: Dictionary = {}) -> void:
+	var normalized_slot := _normalize_slot_name(slot_name)
+	var session := _ensure_slot(normalized_slot)
+	session["state_code"] = state_code
+	session["state_name"] = STATE_NAMES.get(state_code, STATE_IDLE)
+	_slots[normalized_slot] = session
 	var payload := detail.duplicate(true)
-	payload["state"] = _state_name
-	state_changed.emit(_state_name, payload)
+	payload["slot"] = normalized_slot
+	payload["state"] = str(session.get("state_name", STATE_IDLE))
+	_state_changed_for_slot(normalized_slot, payload)
 
-func _emit_position_changed(seconds: float, duration: float) -> void:
+func _emit_position_changed_for_slot(slot_name: String, seconds: float, duration: float) -> void:
 	var normalized := 0.0
 	if duration > 0.0:
 		normalized = clampf(seconds / duration, 0.0, 1.0)
-	position_changed.emit(seconds, normalized)
+	if slot_name == _active_slot:
+		position_changed.emit(seconds, normalized)
+	slot_position_changed.emit(slot_name, seconds, normalized)
 
-func _lifecycle_apply_result(result: Dictionary, fallback_code: String, fallback_message: String) -> bool:
+func _emit_playback_finished_for_slot(slot_name: String) -> void:
+	if slot_name == _active_slot:
+		playback_finished.emit()
+	slot_playback_finished.emit(slot_name)
+
+func _lifecycle_apply_result_for_slot(slot_name: String, result: Dictionary, fallback_code: String, fallback_message: String) -> bool:
 	if bool(result.get(AeroVideoPlaybackContract.RESULT_SUCCESS, false)):
 		return true
-	_raise_error(
+	_raise_error_for_slot(
+		slot_name,
 		String(result.get(AeroVideoPlaybackContract.RESULT_CODE, fallback_code)),
 		String(result.get(AeroVideoPlaybackContract.RESULT_MESSAGE, fallback_message)),
 		result.get(AeroVideoPlaybackContract.RESULT_DETAIL, {}),
@@ -335,26 +467,106 @@ func _lifecycle_apply_result(result: Dictionary, fallback_code: String, fallback
 	)
 	return false
 
-func _apply_result(result: Dictionary, fallback_code: String, fallback_message: String) -> void:
+func _apply_result_for_slot(slot_name: String, result: Dictionary, fallback_code: String, fallback_message: String) -> void:
 	if bool(result.get(AeroVideoPlaybackContract.RESULT_SUCCESS, false)):
-		_last_error = {}
+		var session := _ensure_slot(slot_name)
+		session["last_error"] = {}
+		_slots[_normalize_slot_name(slot_name)] = session
 		return
-	_raise_error(
+	_raise_error_for_slot(
+		slot_name,
 		String(result.get(AeroVideoPlaybackContract.RESULT_CODE, fallback_code)),
 		String(result.get(AeroVideoPlaybackContract.RESULT_MESSAGE, fallback_message)),
 		result.get(AeroVideoPlaybackContract.RESULT_DETAIL, {}),
 		true
 	)
 
-func _raise_error(code: String, message: String, detail: Variant = {}, transition_to_error: bool = true) -> void:
+func _raise_error_for_slot(slot_name: String, code: String, message: String, detail: Variant = {}, transition_to_error: bool = true) -> Dictionary:
+	var normalized_slot := _normalize_slot_name(slot_name)
+	var session := _ensure_slot(normalized_slot)
 	var safe_detail: Dictionary = detail if typeof(detail) == TYPE_DICTIONARY else {"value": detail}
-	_last_error = {
+	session["last_error"] = {
 		"code": code,
 		"message": message,
 		"detail": safe_detail.duplicate(true),
-		"state": _state_name,
+		"state": str(session.get("state_name", STATE_IDLE)),
+		"slot": normalized_slot,
 	}
+	_slots[normalized_slot] = session
 	if transition_to_error:
-		_transition_state(PlaybackState.ERROR, _last_error.duplicate(true))
-	error_raised.emit(_last_error.duplicate(true))
+		_transition_state_for_slot(normalized_slot, PlaybackState.ERROR, session.get("last_error", {}).duplicate(true))
+	var error_payload: Dictionary = session.get("last_error", {}).duplicate(true)
+	if normalized_slot == _active_slot:
+		error_raised.emit(error_payload.duplicate(true))
+	slot_error_raised.emit(normalized_slot, error_payload.duplicate(true))
+	return error_payload
+
+func _ensure_slot(slot_name: String) -> Dictionary:
+	var normalized_slot := _normalize_slot_name(slot_name)
+	if not _slots.has(normalized_slot):
+		_slots[normalized_slot] = {
+			"backend": create_default_backend(),
+			"backend_name": "",
+			"state_name": STATE_IDLE,
+			"state_code": PlaybackState.IDLE,
+			"loaded_source": {},
+			"media_info": {},
+			"last_error": {},
+			"has_loaded_media": false,
+			"surface": null,
+		}
+		var created_backend: AeroVideoPlayerBackend = _slots[normalized_slot].get("backend", null) as AeroVideoPlayerBackend
+		_slots[normalized_slot]["backend_name"] = _resolve_backend_name(created_backend)
+	return _slots[normalized_slot]
+
+func _resolve_backend_name(backend: AeroVideoPlayerBackend) -> String:
+	return backend.get_script().resource_path.get_file().trim_suffix(".gd") if backend != null and backend.get_script() != null else "custom_backend"
+
+func _resolve_slot_from_source(source: Dictionary) -> String:
+	var direct_slot := str(source.get("slot", "")).strip_edges()
+	if not direct_slot.is_empty():
+		return _normalize_slot_name(direct_slot)
+	var metadata: Dictionary = source.get("metadata", {}) if typeof(source.get("metadata", {})) == TYPE_DICTIONARY else {}
+	if typeof(metadata) == TYPE_DICTIONARY:
+		var metadata_slot := str(metadata.get("slot", "")).strip_edges()
+		if not metadata_slot.is_empty():
+			return _normalize_slot_name(metadata_slot)
+	return _active_slot
+
+func _resolve_slot_name(slot_name: String = "", source: Dictionary = {}) -> String:
+	var explicit_slot := str(slot_name).strip_edges()
+	if not explicit_slot.is_empty():
+		return _normalize_slot_name(explicit_slot)
+	if not source.is_empty():
+		return _resolve_slot_from_source(source)
+	return _normalize_slot_name(_active_slot)
+
+func _with_slot(source: Dictionary, slot_name: String) -> Dictionary:
+	var normalized_source := source.duplicate(true)
+	normalized_source["slot"] = slot_name
+	return normalized_source
+
+func _prepare_source_for_slot(source: Dictionary, slot_name: String) -> Dictionary:
+	var prepared_source := get_default_source_config()
+	var session := _ensure_slot(slot_name)
+	var seeded_source: Dictionary = session.get("loaded_source", {}).duplicate(true)
+	if not seeded_source.is_empty():
+		prepared_source.merge(seeded_source, true)
+	prepared_source.merge(source.duplicate(true), true)
+	prepared_source["slot"] = slot_name
+	return prepared_source
+
+func _slot_state_name(slot_name: String) -> String:
+	var session := _ensure_slot(slot_name)
+	return str(session.get("state_name", STATE_IDLE))
+
+func _state_changed_for_slot(slot_name: String, detail: Dictionary) -> void:
+	var state_name := str(detail.get("state", _slot_state_name(slot_name)))
+	if slot_name == _active_slot:
+		state_changed.emit(state_name, detail.duplicate(true))
+	slot_state_changed.emit(slot_name, state_name, detail.duplicate(true))
+
+static func _normalize_slot_name(slot_name: String) -> String:
+	var normalized := slot_name.strip_edges()
+	return normalized if not normalized.is_empty() else DEFAULT_SLOT
 #endregion

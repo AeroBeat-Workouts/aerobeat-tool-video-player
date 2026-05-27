@@ -5,7 +5,7 @@ const PLUGIN_CFG_PATH := "../plugin.cfg"
 const ADDONS_MANIFEST_PATH := "addons.jsonc"
 const SAMPLE_VIDEO_PATH := "res://assets/videos/calm_blue_sea_1.ogv"
 const TESTBED_SCENE_PATH := "res://scenes/video_player_testbed.tscn"
-const EXPECTED_PLUGIN_DESCRIPTION := "Reusable AeroBeat video playback facade centered on AeroVideoPlayerManager, backed by the shared tool-core playback contract and repo-local .ogv proving coverage."
+const EXPECTED_PLUGIN_DESCRIPTION := "Reusable AeroBeat slot-aware video playback facade centered on AeroVideoPlayerManager, backed by the shared tool-core playback contract and repo-local .ogv proving coverage."
 
 func _read_repo_file(relative_path: String) -> String:
 	var absolute_path := ProjectSettings.globalize_path("res://%s" % relative_path)
@@ -18,11 +18,14 @@ func test_readme_describes_video_player_facade_truth() -> void:
 	var readme_text := _read_repo_file(README_PATH)
 	assert_true(readme_text.contains("reusable **video playback contract**"), "README should state that this repo owns the reusable video playback contract")
 	assert_true(readme_text.contains("AeroVideoPlayerManager"), "README should name the stable public facade")
+	assert_true(readme_text.contains("slot-aware"), "README should call out the slot-aware surface")
+	assert_true(readme_text.contains("loop"), "README should describe loop support")
 	assert_true(readme_text.contains("aerobeat-tool-core"), "README should describe the shared tool-core dependency")
 	assert_true(readme_text.contains("PC community first"), "README should preserve PC-first release wording")
 	assert_true(readme_text.contains("Boxing and Flow"), "README should preserve the locked v1 feature slice")
 	assert_true(readme_text.contains("camera only"), "README should preserve camera-only official gameplay input wording")
 	assert_true(readme_text.contains("camera tracking should consume this tool"), "README should preserve the replay ownership split with camera tracking")
+	assert_true(readme_text.contains("two-slot"), "README should call out the two-slot proving surface")
 	assert_true(readme_text.contains("real `.ogv`"), "README should call out the real .ogv proving surface")
 
 func test_plugin_cfg_describes_video_player_facade() -> void:
@@ -33,9 +36,9 @@ func test_plugin_cfg_describes_video_player_facade() -> void:
 	assert_eq(
 		config.get_value("plugin", "description", ""),
 		EXPECTED_PLUGIN_DESCRIPTION,
-		"plugin.cfg description should stay aligned with the renamed facade scope"
+		"plugin.cfg description should stay aligned with the slot-aware facade scope"
 	)
-	assert_eq(config.get_value("plugin", "version", ""), "0.3.0", "plugin version should reflect the lifecycle API expansion")
+	assert_eq(config.get_value("plugin", "version", ""), "0.4.0", "plugin version should reflect loop + multi-slot support")
 
 func test_addons_manifest_keeps_expected_dependencies_only() -> void:
 	var manifest_text := _read_repo_file(ADDONS_MANIFEST_PATH)
