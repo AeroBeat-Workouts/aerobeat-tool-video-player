@@ -44,8 +44,9 @@ The hidden `.testbed/` workbench now includes a real `.ogv` proving surface.
 - `.testbed/assets/videos/calm_blue_sea_1.ogv` reuses the proven environment-lane sample.
 - `.testbed/scenes/video_player_testbed.tscn` now provides a repo-local two-slot manual smoke scene with independent load / play / pause / stop / seek / unload / loop controls for `left` and `right` video slots.
 - `.testbed/scripts/video_player_testbed.gd` wires the stable public facade into that scene through direct injection of the real `aerobeat-vendor-godot-video` backend, so manual proving follows the real backend path instead of the default fake backend.
-- The proving HUD displays per-slot backend, state, position, duration, and loop state so humans can exercise multi-video control through the tool abstraction rather than talking to the vendor layer directly.
-- The proving HUD uses the truthful sample duration hint (`28.693313s`, measured from the shipped `.ogv`) so humans can verify seek behavior against the real clip.
+- Each slot now exposes manual source input plus quick presets for package-relative paths inside the Godot project, copied absolute device paths outside the project, and URL entry, along with a duration-hint input so arbitrary sources can still drive the timeline honestly.
+- The proving HUD displays per-slot backend, state, position, duration, resolved playback path, and loop state so humans can exercise multi-video control through the tool abstraction rather than talking to the vendor layer directly.
+- The seek sliders are the clickable timelines for both slots, and the shipped sample preset uses the truthful `28.693313s` duration hint so humans can verify seek behavior against the real clip.
 
 This keeps the repo honest about the primary first verified media target while still letting the facade stay backend-injection-friendly.
 
