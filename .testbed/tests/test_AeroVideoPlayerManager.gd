@@ -230,7 +230,12 @@ func test_reset_and_unload_are_slot_scoped() -> void:
 
 	_manager.unload("right")
 	assert_eq(String(_manager.get_state("right").get("state", "")), AeroVideoPlayerManager.STATE_IDLE, "unload should idle only the targeted slot")
+	assert_true(bool(_manager.get_state("right").get("surface_attached", false)), "unload should preserve the targeted slot surface binding for later reloads")
 	assert_eq(String(_manager.get_state("left").get("state", "")), AeroVideoPlayerManager.STATE_READY, "unload should not disturb other loaded slots")
+
+	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "cover_mode": AeroVideoPlayerManager.COVER_MODE_CONTAIN, "audio_level": 0.2}, "right")
+	assert_eq(String(_manager.get_state("right").get("state", "")), AeroVideoPlayerManager.STATE_READY, "A slot should be reloadable after unload without reattaching its surface")
+	assert_true(bool(_manager.get_state("right").get("surface_attached", false)), "Reload after unload should still render through the preserved surface")
 
 func test_invalid_source_raises_slot_scoped_contract_error_without_crashing() -> void:
 	var slot_errors: Array[Dictionary] = []

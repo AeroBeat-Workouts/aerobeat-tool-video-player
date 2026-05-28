@@ -21,6 +21,9 @@ func pause() -> Dictionary:
 func stop() -> Dictionary:
 	return _unsupported("stop")
 
+func unload() -> Dictionary:
+	return _unsupported("unload")
+
 func seek(_seconds: float) -> Dictionary:
 	return _unsupported("seek")
 

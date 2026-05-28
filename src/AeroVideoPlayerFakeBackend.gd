@@ -64,6 +64,21 @@ func stop() -> Dictionary:
 	_position_seconds = 0.0
 	return AeroVideoPlaybackContract.ok({"state": _state})
 
+func unload() -> Dictionary:
+	_source = {}
+	_media_info = {}
+	_position_seconds = 0.0
+	_duration_seconds = 0.0
+	_loop_enabled = false
+	_rate = 1.0
+	_state = AeroVideoPlaybackContract.STATE_IDLE
+	_last_error = {}
+	return AeroVideoPlaybackContract.ok({
+		"state": _state,
+		"surface_attached": _surface != null,
+		"media_loaded": false,
+	})
+
 func seek(seconds: float) -> Dictionary:
 	if _source.is_empty():
 		return _fail("backend_not_ready", "Cannot seek before media has been loaded.")

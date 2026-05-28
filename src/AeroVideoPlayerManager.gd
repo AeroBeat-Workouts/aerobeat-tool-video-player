@@ -299,10 +299,7 @@ func unload(slot_name: String = "") -> void:
 	var session := _ensure_slot(resolved_slot)
 	var backend: AeroVideoPlayerBackend = session.get("backend", null)
 	if bool(session.get("has_loaded_media", false)):
-		_lifecycle_apply_result_for_slot(resolved_slot, backend.stop(), ERROR_BACKEND_REJECTED, "Backend failed to stop playback during unload.")
-	if session.get("surface", null) != null:
-		_lifecycle_apply_result_for_slot(resolved_slot, backend.detach_surface(), ERROR_INVALID_SURFACE, "Backend failed to detach the output surface during unload.")
-	session["surface"] = null
+		_lifecycle_apply_result_for_slot(resolved_slot, backend.unload(), ERROR_BACKEND_REJECTED, "Backend failed to unload media.")
 	session["loaded_source"] = {}
 	session["media_info"] = {}
 	session["last_error"] = {}
