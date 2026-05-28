@@ -9,9 +9,9 @@ var stream_position: float = 0.0
 var volume: float = 1.0
 var volume_db: float = 0.0
 var stream: Variant = null
-var last_source_descriptor: Dictionary = {}
 var cover_mode: String = "contain"
 var audio_level: float = 1.0
+var last_source_descriptor: Dictionary = {}
 
 func play() -> void:
 	playing = true
