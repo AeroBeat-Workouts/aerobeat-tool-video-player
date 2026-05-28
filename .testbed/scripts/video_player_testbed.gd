@@ -25,9 +25,9 @@ const GodotBackendScript := preload("res://addons/aerobeat-vendor-godot-video/sr
 		"seek_slider": %LeftSeekSlider,
 		"seek_value_label": %LeftSeekValueLabel,
 		"loop_checkbox": %LeftLoopCheckBox,
-		"cover_option": %LeftCoverOptionButton,
-		"audio_slider": %LeftAudioSlider,
-		"audio_value_label": %LeftAudioValueLabel,
+		"cover_option": %LeftCoverModeOption,
+		"audio_slider": %LeftAudioLevelSlider,
+		"audio_value_label": %LeftAudioLevelValueLabel,
 		"surface": %LeftSurface,
 	},
 	SLOT_RIGHT: {
@@ -39,9 +39,9 @@ const GodotBackendScript := preload("res://addons/aerobeat-vendor-godot-video/sr
 		"seek_slider": %RightSeekSlider,
 		"seek_value_label": %RightSeekValueLabel,
 		"loop_checkbox": %RightLoopCheckBox,
-		"cover_option": %RightCoverOptionButton,
-		"audio_slider": %RightAudioSlider,
-		"audio_value_label": %RightAudioValueLabel,
+		"cover_option": %RightCoverModeOption,
+		"audio_slider": %RightAudioLevelSlider,
+		"audio_value_label": %RightAudioLevelValueLabel,
 		"surface": %RightSurface,
 	},
 }
@@ -51,11 +51,11 @@ var _slot_slider_updates := {
 	SLOT_LEFT: false,
 	SLOT_RIGHT: false,
 }
-var _slot_cover_updates := {
+var _slot_audio_slider_updates := {
 	SLOT_LEFT: false,
 	SLOT_RIGHT: false,
 }
-var _slot_audio_updates := {
+var _slot_cover_updates := {
 	SLOT_LEFT: false,
 	SLOT_RIGHT: false,
 }
@@ -76,13 +76,13 @@ func _ready() -> void:
 		seek_slider.value = 0.0
 		seek_value_label.text = _format_seconds(0.0)
 		cover_option.clear()
-		for cover_mode in COVER_MODE_OPTIONS:
-			cover_option.add_item(_cover_mode_label(cover_mode))
+		for mode in COVER_MODE_OPTIONS:
+			cover_option.add_item(mode.capitalize(), COVER_MODE_OPTIONS.find(mode))
 		audio_slider.min_value = 0.0
 		audio_slider.max_value = 1.0
 		audio_slider.step = 0.01
-		audio_slider.value = 1.0
-		audio_value_label.text = _format_audio_level(1.0)
+		audio_slider.value = AeroVideoPlayerManager.DEFAULT_AUDIO_LEVEL
+		audio_value_label.text = _format_audio_level(AeroVideoPlayerManager.DEFAULT_AUDIO_LEVEL)
 
 	_manager = AeroVideoPlayerManager.new()
 	_manager.set_backend_factory(Callable(self, "_create_backend"))
@@ -97,7 +97,7 @@ func _ready() -> void:
 		var surface: Control = ui.get("surface")
 		_manager.attach_surface(surface, slot_name)
 		_manager.set_loop(bool((ui.get("loop_checkbox") as CheckBox).button_pressed), slot_name)
-		_manager.set_cover_mode(AeroVideoPlayerManager.DEFAULT_COVER_MODE, slot_name)
+		_manager.set_cover_mode(COVER_MODE_OPTIONS[(ui.get("cover_option") as OptionButton).selected], slot_name)
 		_manager.set_audio_level((ui.get("audio_slider") as HSlider).value, slot_name)
 		_load_sample(slot_name)
 
@@ -119,12 +119,14 @@ func _load_sample(slot_name: String) -> void:
 	_manager.set_active_slot(slot_name)
 	var ui: Dictionary = slot_ui.get(slot_name, {})
 	var loop_checkbox: CheckBox = ui.get("loop_checkbox")
+	var cover_option: OptionButton = ui.get("cover_option")
 	var audio_slider: HSlider = ui.get("audio_slider")
+	var cover_mode: String = COVER_MODE_OPTIONS[clampi(cover_option.selected, 0, COVER_MODE_OPTIONS.size() - 1)]
 	_manager.load({
 		"path": SAMPLE_VIDEO_PATH,
 		"slot": slot_name,
 		"loop": loop_checkbox.button_pressed,
-		"cover_mode": _selected_cover_mode(slot_name),
+		"cover_mode": cover_mode,
 		"audio_level": audio_slider.value,
 		"duration_hint": SAMPLE_DURATION_SECONDS,
 		"metadata": {
@@ -166,6 +168,7 @@ func _sync_slot_ui(slot_name: String) -> void:
 	var state := _manager.get_state(slot_name)
 	var position := _manager.get_position(slot_name)
 	var duration := _manager.get_duration(slot_name)
+	var audio: Dictionary = state.get("audio", {}) if typeof(state.get("audio", {})) == TYPE_DICTIONARY else {}
 	var backend_label: Label = ui.get("backend_label")
 	var playback_label: Label = ui.get("playback_label")
 	var position_label: Label = ui.get("position_label")
@@ -181,7 +184,7 @@ func _sync_slot_ui(slot_name: String) -> void:
 		String(state.get("state", "idle")),
 		"on" if bool(state.get("loop", false)) else "off",
 		String(state.get("cover_mode", AeroVideoPlayerManager.DEFAULT_COVER_MODE)),
-		_format_audio_level(float(state.get("audio_level", 1.0))),
+		_format_audio_level(float(audio.get("audio_level", state.get("audio_level", AeroVideoPlayerManager.DEFAULT_AUDIO_LEVEL)))),
 	]
 	position_label.text = "Position: %s" % _format_seconds(position)
 	duration_label.text = "Duration: %s" % _format_seconds(duration)
@@ -193,12 +196,12 @@ func _sync_slot_ui(slot_name: String) -> void:
 	loop_checkbox.set_pressed_no_signal(bool(state.get("loop", false)))
 	_slot_slider_updates[slot_name] = false
 	_slot_cover_updates[slot_name] = true
-	cover_option.select(_cover_mode_index(String(state.get("cover_mode", AeroVideoPlayerManager.DEFAULT_COVER_MODE))))
+	cover_option.select(COVER_MODE_OPTIONS.find(String(state.get("cover_mode", AeroVideoPlayerManager.DEFAULT_COVER_MODE))))
 	_slot_cover_updates[slot_name] = false
-	_slot_audio_updates[slot_name] = true
-	audio_slider.value = float(state.get("audio_level", 1.0))
+	_slot_audio_slider_updates[slot_name] = true
+	audio_slider.value = float(audio.get("audio_level", state.get("audio_level", AeroVideoPlayerManager.DEFAULT_AUDIO_LEVEL)))
 	audio_value_label.text = _format_audio_level(audio_slider.value)
-	_slot_audio_updates[slot_name] = false
+	_slot_audio_slider_updates[slot_name] = false
 
 func _format_seconds(seconds: float) -> String:
 	var clamped := maxf(seconds, 0.0)
@@ -206,35 +209,14 @@ func _format_seconds(seconds: float) -> String:
 	var remainder := clamped - float(minutes * 60)
 	return "%02d:%05.2f" % [minutes, remainder]
 
-func _format_audio_level(audio_level: float) -> String:
-	return "%d%%" % int(round(clampf(audio_level, 0.0, 1.0) * 100.0))
+func _format_audio_level(value: float) -> String:
+	return "%.0f%%" % (clampf(value, 0.0, 1.0) * 100.0)
 
 func _seek_by(slot_name: String, delta_seconds: float) -> void:
 	if _manager == null or _manager.get_duration(slot_name) <= 0.0:
 		return
 	_manager.set_active_slot(slot_name)
 	_manager.seek(clampf(_manager.get_position(slot_name) + delta_seconds, 0.0, _manager.get_duration(slot_name)), slot_name)
-
-func _cover_mode_index(cover_mode: String) -> int:
-	var normalized := String(cover_mode).strip_edges().to_lower()
-	var index := COVER_MODE_OPTIONS.find(normalized)
-	return index if index >= 0 else COVER_MODE_OPTIONS.find(AeroVideoPlayerManager.DEFAULT_COVER_MODE)
-
-func _cover_mode_label(cover_mode: String) -> String:
-	match cover_mode:
-		AeroVideoPlayerManager.COVER_MODE_STRETCH:
-			return "Stretch"
-		AeroVideoPlayerManager.COVER_MODE_COVER:
-			return "Cover"
-		_:
-			return "Contain"
-
-func _selected_cover_mode(slot_name: String) -> String:
-	var option: OptionButton = slot_ui.get(slot_name, {}).get("cover_option")
-	var selected := option.selected
-	if selected < 0 or selected >= COVER_MODE_OPTIONS.size():
-		return AeroVideoPlayerManager.DEFAULT_COVER_MODE
-	return COVER_MODE_OPTIONS[selected]
 
 func _on_left_load_button_pressed() -> void:
 	_load_sample(SLOT_LEFT)
@@ -276,16 +258,16 @@ func _on_left_loop_check_box_toggled(toggled_on: bool) -> void:
 	_manager.set_active_slot(SLOT_LEFT)
 	_manager.set_loop(toggled_on, SLOT_LEFT)
 
-func _on_left_cover_option_button_item_selected(_index: int) -> void:
+func _on_left_cover_mode_option_item_selected(index: int) -> void:
 	if bool(_slot_cover_updates.get(SLOT_LEFT, false)):
 		return
 	_manager.set_active_slot(SLOT_LEFT)
-	_manager.set_cover_mode(_selected_cover_mode(SLOT_LEFT), SLOT_LEFT)
+	_manager.set_cover_mode(COVER_MODE_OPTIONS[index], SLOT_LEFT)
 
-func _on_left_audio_slider_value_changed(value: float) -> void:
-	(slot_ui[SLOT_LEFT].get("audio_value_label") as Label).text = _format_audio_level(value)
-	if bool(_slot_audio_updates.get(SLOT_LEFT, false)):
+func _on_left_audio_level_slider_value_changed(value: float) -> void:
+	if bool(_slot_audio_slider_updates.get(SLOT_LEFT, false)):
 		return
+	(slot_ui[SLOT_LEFT].get("audio_value_label") as Label).text = _format_audio_level(value)
 	_manager.set_active_slot(SLOT_LEFT)
 	_manager.set_audio_level(value, SLOT_LEFT)
 
@@ -329,15 +311,15 @@ func _on_right_loop_check_box_toggled(toggled_on: bool) -> void:
 	_manager.set_active_slot(SLOT_RIGHT)
 	_manager.set_loop(toggled_on, SLOT_RIGHT)
 
-func _on_right_cover_option_button_item_selected(_index: int) -> void:
+func _on_right_cover_mode_option_item_selected(index: int) -> void:
 	if bool(_slot_cover_updates.get(SLOT_RIGHT, false)):
 		return
 	_manager.set_active_slot(SLOT_RIGHT)
-	_manager.set_cover_mode(_selected_cover_mode(SLOT_RIGHT), SLOT_RIGHT)
+	_manager.set_cover_mode(COVER_MODE_OPTIONS[index], SLOT_RIGHT)
 
-func _on_right_audio_slider_value_changed(value: float) -> void:
-	(slot_ui[SLOT_RIGHT].get("audio_value_label") as Label).text = _format_audio_level(value)
-	if bool(_slot_audio_updates.get(SLOT_RIGHT, false)):
+func _on_right_audio_level_slider_value_changed(value: float) -> void:
+	if bool(_slot_audio_slider_updates.get(SLOT_RIGHT, false)):
 		return
+	(slot_ui[SLOT_RIGHT].get("audio_value_label") as Label).text = _format_audio_level(value)
 	_manager.set_active_slot(SLOT_RIGHT)
 	_manager.set_audio_level(value, SLOT_RIGHT)
