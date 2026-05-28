@@ -1,7 +1,7 @@
 extends GutTest
 
 const AeroVideoPlaybackContract := preload("res://addons/aerobeat-tool-core/globals/aero_video_playback_contract.gd")
-const FAKE_BACKEND_SCRIPT := preload("res://src/AeroVideoPlayerFakeBackend.gd")
+const FAKE_BACKEND_SCRIPT := preload("res://addons/aerobeat-tool-video-player/src/AeroVideoPlayerFakeBackend.gd")
 const GODOT_BACKEND_SCRIPT := preload("res://addons/aerobeat-vendor-godot-video/src/AeroGodotVideoBackend.gd")
 const FAKE_VIDEO_STREAM_PLAYER_SCRIPT := preload("res://tests/helpers/FakeVideoStreamPlayer.gd")
 const SAMPLE_VIDEO_PATH := "res://assets/videos/calm_blue_sea_1.ogv"
