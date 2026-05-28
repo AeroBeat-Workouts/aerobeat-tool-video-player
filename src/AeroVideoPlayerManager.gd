@@ -138,6 +138,13 @@ func get_default_source_config() -> Dictionary:
 
 func normalize_source(source: Dictionary) -> Dictionary:
 	var normalized := AeroVideoPlaybackContract.normalize_source(source)
+	var normalized_path := str(normalized.get("path", "")).strip_edges()
+	var normalized_kind := str(normalized.get("kind", SOURCE_KIND_FILE)).strip_edges().to_lower()
+	var inferred_kind := _infer_source_kind(normalized_path)
+	if inferred_kind == SOURCE_KIND_URL:
+		normalized_kind = SOURCE_KIND_URL
+	normalized["path"] = normalized_path
+	normalized["kind"] = normalized_kind
 	normalized["slot"] = _resolve_slot_from_source(source)
 	normalized["cover_mode"] = _normalize_cover_mode(source.get("cover_mode", normalized.get("cover_mode", DEFAULT_COVER_MODE)))
 	normalized["audio_level"] = _normalize_audio_level(source.get("audio_level", normalized.get("audio_level", DEFAULT_AUDIO_LEVEL)))
@@ -677,4 +684,10 @@ func _state_changed_for_slot(slot_name: String, detail: Dictionary) -> void:
 static func _normalize_slot_name(slot_name: String) -> String:
 	var normalized := slot_name.strip_edges()
 	return normalized if not normalized.is_empty() else DEFAULT_SLOT
+
+static func _infer_source_kind(path: String) -> String:
+	var lowered := path.strip_edges().to_lower()
+	if lowered.begins_with("http://") or lowered.begins_with("https://"):
+		return SOURCE_KIND_URL
+	return SOURCE_KIND_FILE
 #endregion

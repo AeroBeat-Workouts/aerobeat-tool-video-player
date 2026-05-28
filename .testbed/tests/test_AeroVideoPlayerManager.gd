@@ -8,6 +8,8 @@ const SAMPLE_VIDEO_PATH := "res://assets/videos/calm_blue_sea_1.ogv"
 const SAMPLE_DURATION_SECONDS := 28.693313
 
 var _manager: AeroVideoPlayerManager
+var _external_tmp_dir: String = ""
+var _external_sample_path: String = ""
 
 func _make_fake_player() -> Node:
 	return FAKE_VIDEO_STREAM_PLAYER_SCRIPT.new()
@@ -15,12 +17,33 @@ func _make_fake_player() -> Node:
 func _make_fake_vendor_backend() -> AeroVideoPlayerBackend:
 	var backend := GODOT_BACKEND_SCRIPT.new()
 	backend.set_player_factory(Callable(self, "_make_fake_player"))
+	backend.set_remote_source_resolver(Callable(self, "_resolve_remote_sample"))
 	return backend
+
+func _resolve_remote_sample(_url: String) -> String:
+	return _external_sample_path
 
 func before_each() -> void:
 	_manager = AeroVideoPlayerManager.new()
 	add_child_autofree(_manager)
 	_manager._initialize()
+	_prepare_external_sample()
+
+func after_each() -> void:
+	if not _external_sample_path.is_empty() and FileAccess.file_exists(_external_sample_path):
+		DirAccess.remove_absolute(_external_sample_path)
+	if not _external_tmp_dir.is_empty() and DirAccess.dir_exists_absolute(_external_tmp_dir):
+		DirAccess.remove_absolute(_external_tmp_dir)
+	_external_sample_path = ""
+	_external_tmp_dir = ""
+
+func _prepare_external_sample() -> void:
+	_external_tmp_dir = OS.get_cache_dir().path_join("aerobeat-tool-video-player-external-%s" % str(Time.get_unix_time_from_system()))
+	var mkdir_error := DirAccess.make_dir_recursive_absolute(_external_tmp_dir)
+	assert_eq(mkdir_error, OK, "Should create a temporary directory for remote-url coverage")
+	_external_sample_path = _external_tmp_dir.path_join("external-sample.ogv")
+	var copy_error := DirAccess.copy_absolute(ProjectSettings.globalize_path(SAMPLE_VIDEO_PATH), _external_sample_path)
+	assert_eq(copy_error, OK, "Should copy the proven sample outside the project tree for remote-url coverage")
 
 func test_public_facade_exposes_stable_video_player_surface() -> void:
 	assert_eq(AeroVideoPlayerManager.VERSION, "0.5.0", "Version should reflect cover-mode + audio-level support")
@@ -82,7 +105,7 @@ func test_normalize_source_delegates_to_shared_contract_and_adds_slots_cover_and
 	}
 	var normalized := _manager.normalize_source(source)
 	assert_eq(String(normalized.get("path", "")), "res://assets/videos/calm_blue_sea_1.ogv", "normalize_source should trim path whitespace")
-	assert_eq(String(normalized.get("kind", "")), AeroVideoPlayerManager.SOURCE_KIND_FILE, "normalize_source should default kind to file")
+	assert_eq(String(normalized.get("kind", "")), AeroVideoPlayerManager.SOURCE_KIND_FILE, "normalize_source should keep project paths as local file sources by default")
 	assert_false(bool(normalized.get("loop", true)), "normalize_source should default loop to false")
 	assert_true(bool(normalized.get("autoplay", false)), "normalize_source should preserve autoplay")
 	assert_eq(float(normalized.get("start_time", -1.0)), 0.0, "normalize_source should default start_time to zero")
@@ -90,6 +113,15 @@ func test_normalize_source_delegates_to_shared_contract_and_adds_slots_cover_and
 	assert_eq(String(normalized.get("slot", "")), "right", "normalize_source should resolve slots from metadata")
 	assert_eq(String(normalized.get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_COVER, "normalize_source should preserve supported cover modes")
 	assert_eq(float(normalized.get("audio_level", -1.0)), 0.35, "normalize_source should preserve audio level")
+
+func test_normalize_source_reclassifies_http_urls_as_remote_sources() -> void:
+	var normalized := _manager.normalize_source({
+		"path": " https://upload.wikimedia.org/wikipedia/commons/6/65/Examplevideo.ogv ",
+		"metadata": {"slot": "remote"},
+	})
+	assert_eq(String(normalized.get("path", "")), "https://upload.wikimedia.org/wikipedia/commons/6/65/Examplevideo.ogv", "normalize_source should trim remote URL whitespace")
+	assert_eq(String(normalized.get("kind", "")), AeroVideoPlayerManager.SOURCE_KIND_URL, "normalize_source should classify http(s) paths as remote URLs even when kind is omitted")
+	assert_eq(String(normalized.get("slot", "")), "remote", "normalize_source should still resolve the requested slot")
 
 func test_primary_slot_transport_controls_preserve_existing_behavior_and_report_cover_audio() -> void:
 	var states: Array[String] = []
@@ -236,6 +268,31 @@ func test_reset_and_unload_are_slot_scoped() -> void:
 	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "cover_mode": AeroVideoPlayerManager.COVER_MODE_CONTAIN, "audio_level": 0.2}, "right")
 	assert_eq(String(_manager.get_state("right").get("state", "")), AeroVideoPlayerManager.STATE_READY, "A slot should be reloadable after unload without reattaching its surface")
 	assert_true(bool(_manager.get_state("right").get("surface_attached", false)), "Reload after unload should still render through the preserved surface")
+
+func test_manager_load_accepts_http_url_sources_without_explicit_kind_when_vendor_backend_is_injected() -> void:
+	var manager := AeroVideoPlayerManager.new()
+	manager.set_backend_factory(Callable(self, "_make_fake_vendor_backend"))
+	add_child_autofree(manager)
+	manager._initialize()
+	var remote_errors: Array[Dictionary] = []
+	manager.slot_error_raised.connect(func(slot_name: String, error_info: Dictionary): remote_errors.append({"slot": slot_name, "error": error_info.duplicate(true)}))
+
+	var surface := Control.new()
+	surface.name = "RemoteManagedSurface"
+	surface.custom_minimum_size = Vector2(640, 360)
+	add_child_autofree(surface)
+	manager.attach_surface(surface, "remote")
+	manager.load({
+		"path": "https://upload.wikimedia.org/wikipedia/commons/6/65/Examplevideo.ogv",
+		"duration_hint": SAMPLE_DURATION_SECONDS,
+		"metadata": {"source": "wikimedia_repro"},
+	}, "remote")
+
+	assert_true(remote_errors.is_empty(), "Remote URL loads should not be rejected as invalid local-file sources when kind is omitted")
+	assert_eq(String(manager.get_state("remote").get("state", "")), AeroVideoPlayerManager.STATE_READY, "Injected vendor backend should reach ready for http(s) sources without an explicit kind")
+	assert_eq(String(manager.get_media_info("remote").get("kind", "")), AeroVideoPlayerManager.SOURCE_KIND_URL, "Media info should report the normalized remote url source kind")
+	assert_eq(String(manager.get_media_info("remote").get("path", "")), "https://upload.wikimedia.org/wikipedia/commons/6/65/Examplevideo.ogv", "Manager should preserve the caller-facing URL after load")
+	assert_eq(String(manager.get_media_info("remote").get("resolved_path", "")), _external_sample_path, "Injected vendor backend should use the deterministic resolved cache file path for remote loads")
 
 func test_invalid_source_raises_slot_scoped_contract_error_without_crashing() -> void:
 	var slot_errors: Array[Dictionary] = []
