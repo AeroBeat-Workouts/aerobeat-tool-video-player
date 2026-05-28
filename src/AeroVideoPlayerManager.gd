@@ -35,7 +35,7 @@ enum PlaybackState {
 	ERROR,
 }
 
-const VERSION: String = "0.4.0"
+const VERSION: String = "0.5.0"
 const DEFAULT_SLOT := "primary"
 const STATE_IDLE := AeroVideoPlaybackContract.STATE_IDLE
 const STATE_LOADING := AeroVideoPlaybackContract.STATE_LOADING
@@ -64,6 +64,12 @@ const ERROR_INVALID_SOURCE := AeroVideoPlaybackContract.ERROR_INVALID_SOURCE
 const ERROR_INVALID_SURFACE := AeroVideoPlaybackContract.ERROR_INVALID_SURFACE
 const ERROR_BACKEND_REJECTED := AeroVideoPlaybackContract.ERROR_BACKEND_REJECTED
 const ERROR_NOT_READY := AeroVideoPlaybackContract.ERROR_NOT_READY
+const COVER_MODE_STRETCH := "stretch"
+const COVER_MODE_CONTAIN := "contain"
+const COVER_MODE_COVER := "cover"
+const COVER_MODES := [COVER_MODE_STRETCH, COVER_MODE_CONTAIN, COVER_MODE_COVER]
+const DEFAULT_COVER_MODE := COVER_MODE_CONTAIN
+const DEFAULT_AUDIO_LEVEL := 1.0
 #endregion
 
 #region EXPORTS
@@ -102,6 +108,10 @@ func set_backend(backend: AeroVideoPlayerBackend, slot_name: String = DEFAULT_SL
 	var surface: Node = session.get("surface", null)
 	if surface != null and backend.has_method("attach_surface"):
 		backend.attach_surface(surface)
+	if backend.has_method("set_cover_mode"):
+		backend.set_cover_mode(String(session.get("cover_mode", DEFAULT_COVER_MODE)))
+	if backend.has_method("set_audio_level"):
+		backend.set_audio_level(float(session.get("audio_level", DEFAULT_AUDIO_LEVEL)))
 
 func set_backend_factory(factory: Callable) -> void:
 	_backend_factory = factory
@@ -121,11 +131,15 @@ func create_default_backend() -> AeroVideoPlayerBackend:
 func get_default_source_config() -> Dictionary:
 	var config := AeroVideoPlaybackContract.get_default_source_config()
 	config["slot"] = DEFAULT_SLOT
+	config["cover_mode"] = DEFAULT_COVER_MODE
+	config["audio_level"] = DEFAULT_AUDIO_LEVEL
 	return config
 
 func normalize_source(source: Dictionary) -> Dictionary:
 	var normalized := AeroVideoPlaybackContract.normalize_source(source)
 	normalized["slot"] = _resolve_slot_from_source(source)
+	normalized["cover_mode"] = _normalize_cover_mode_variant(normalized.get("cover_mode", source.get("cover_mode", DEFAULT_COVER_MODE)))
+	normalized["audio_level"] = _normalize_audio_level_variant(normalized.get("audio_level", source.get("audio_level", DEFAULT_AUDIO_LEVEL)))
 	return normalized
 
 func can_load_source(source: Dictionary) -> bool:
@@ -172,9 +186,12 @@ func load(source: Dictionary, slot_name: String = "") -> void:
 	_apply_result_for_slot(resolved_slot, backend.load(normalized), ERROR_BACKEND_REJECTED, "Backend failed to load media.")
 	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
+	session = _ensure_slot(resolved_slot)
 	session["loaded_source"] = normalized.duplicate(true)
 	session["media_info"] = backend.get_media_info()
 	session["has_loaded_media"] = true
+	session["cover_mode"] = String(normalized.get("cover_mode", DEFAULT_COVER_MODE))
+	session["audio_level"] = float(normalized.get("audio_level", DEFAULT_AUDIO_LEVEL))
 	session["last_error"] = {}
 	_slots[resolved_slot] = session
 	_apply_result_for_slot(resolved_slot, backend.set_loop(bool(normalized.get("loop", false))), ERROR_BACKEND_REJECTED, "Backend rejected loop config.")
@@ -183,6 +200,14 @@ func load(source: Dictionary, slot_name: String = "") -> void:
 	_apply_result_for_slot(resolved_slot, backend.set_rate(float(normalized.get("rate", 1.0))), ERROR_BACKEND_REJECTED, "Backend rejected playback rate.")
 	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
+	if backend.has_method("set_cover_mode"):
+		_apply_result_for_slot(resolved_slot, backend.set_cover_mode(String(normalized.get("cover_mode", DEFAULT_COVER_MODE))), ERROR_BACKEND_REJECTED, "Backend rejected cover mode.")
+		if _slot_state_name(resolved_slot) == STATE_ERROR:
+			return
+	if backend.has_method("set_audio_level"):
+		_apply_result_for_slot(resolved_slot, backend.set_audio_level(float(normalized.get("audio_level", DEFAULT_AUDIO_LEVEL))), ERROR_BACKEND_REJECTED, "Backend rejected audio level.")
+		if _slot_state_name(resolved_slot) == STATE_ERROR:
+			return
 	var surface: Node = session.get("surface", null)
 	if surface != null:
 		_apply_result_for_slot(resolved_slot, backend.attach_surface(surface), ERROR_INVALID_SURFACE, "Backend rejected the output surface.")
@@ -281,6 +306,8 @@ func unload(slot_name: String = "") -> void:
 	session["media_info"] = {}
 	session["last_error"] = {}
 	session["has_loaded_media"] = false
+	session["cover_mode"] = DEFAULT_COVER_MODE
+	session["audio_level"] = DEFAULT_AUDIO_LEVEL
 	_slots[resolved_slot] = session
 	_transition_state_for_slot(resolved_slot, PlaybackState.IDLE)
 	_emit_position_changed_for_slot(resolved_slot, 0.0, 0.0)
@@ -333,6 +360,46 @@ func set_rate(rate: float, slot_name: String = "") -> void:
 		return
 	_state_changed_for_slot(resolved_slot, get_state(resolved_slot))
 
+func set_cover_mode(cover_mode: String, slot_name: String = "") -> void:
+	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var normalized_cover_mode := _normalize_cover_mode_variant(cover_mode)
+	var session := _ensure_slot(resolved_slot)
+	var source: Dictionary = session.get("loaded_source", {}).duplicate(true)
+	if source.is_empty():
+		source = get_default_source_config()
+		source["slot"] = resolved_slot
+	source["cover_mode"] = normalized_cover_mode
+	session["loaded_source"] = source
+	session["cover_mode"] = normalized_cover_mode
+	_slots[resolved_slot] = session
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	if backend != null and backend.has_method("set_cover_mode"):
+		_apply_result_for_slot(resolved_slot, backend.set_cover_mode(normalized_cover_mode), ERROR_BACKEND_REJECTED, "Backend failed to update cover mode.")
+		if _slot_state_name(resolved_slot) == STATE_ERROR:
+			return
+	_state_changed_for_slot(resolved_slot, get_state(resolved_slot))
+
+func set_audio_level(audio_level: float, slot_name: String = "") -> void:
+	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var normalized_audio_level := _normalize_audio_level_variant(audio_level)
+	var session := _ensure_slot(resolved_slot)
+	var source: Dictionary = session.get("loaded_source", {}).duplicate(true)
+	if source.is_empty():
+		source = get_default_source_config()
+		source["slot"] = resolved_slot
+	source["audio_level"] = normalized_audio_level
+	session["loaded_source"] = source
+	session["audio_level"] = normalized_audio_level
+	_slots[resolved_slot] = session
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	if backend != null and backend.has_method("set_audio_level"):
+		_apply_result_for_slot(resolved_slot, backend.set_audio_level(normalized_audio_level), ERROR_BACKEND_REJECTED, "Backend failed to update audio level.")
+		if _slot_state_name(resolved_slot) == STATE_ERROR:
+			return
+	_state_changed_for_slot(resolved_slot, get_state(resolved_slot))
+
 func get_state(slot_name: String = "") -> Dictionary:
 	_initialize()
 	var resolved_slot := _resolve_slot_name(slot_name)
@@ -351,6 +418,8 @@ func get_state(slot_name: String = "") -> Dictionary:
 		"duration": get_duration(resolved_slot),
 		"loop": bool(backend_state.get("loop", session.get("loaded_source", {}).get("loop", false))),
 		"rate": float(backend_state.get("rate", session.get("loaded_source", {}).get("rate", 1.0))),
+		"cover_mode": String(backend_state.get("cover_mode", session.get("loaded_source", {}).get("cover_mode", session.get("cover_mode", DEFAULT_COVER_MODE)))),
+		"audio_level": float(backend_state.get("audio_level", session.get("loaded_source", {}).get("audio_level", session.get("audio_level", DEFAULT_AUDIO_LEVEL)))),
 		"surface_attached": bool(backend_state.get("surface_attached", session.get("surface", null) != null)),
 		"backend": str(session.get("backend_name", "")),
 		"last_error": session.get("last_error", {}).duplicate(true),
@@ -397,6 +466,14 @@ func attach_surface(node: Node, slot_name: String = "") -> void:
 	_apply_result_for_slot(resolved_slot, backend.attach_surface(node), ERROR_INVALID_SURFACE, "Backend rejected the output surface.")
 	if _slot_state_name(resolved_slot) == STATE_ERROR:
 		return
+	if backend != null and backend.has_method("set_cover_mode"):
+		_apply_result_for_slot(resolved_slot, backend.set_cover_mode(String(session.get("cover_mode", DEFAULT_COVER_MODE))), ERROR_BACKEND_REJECTED, "Backend failed to apply the slot cover mode.")
+		if _slot_state_name(resolved_slot) == STATE_ERROR:
+			return
+	if backend != null and backend.has_method("set_audio_level"):
+		_apply_result_for_slot(resolved_slot, backend.set_audio_level(float(session.get("audio_level", DEFAULT_AUDIO_LEVEL))), ERROR_BACKEND_REJECTED, "Backend failed to apply the slot audio level.")
+		if _slot_state_name(resolved_slot) == STATE_ERROR:
+			return
 	var detail := get_state(resolved_slot)
 	detail["surface_path"] = str(node.get_path()) if node.is_inside_tree() else node.name
 	_state_changed_for_slot(resolved_slot, detail)
@@ -422,7 +499,24 @@ func get_last_error(slot_name: String = "") -> Dictionary:
 
 #region PRIVATE HELPERS
 func _validate_source(source: Dictionary) -> Dictionary:
-	return AeroVideoPlaybackContract.validate_source(source)
+	var validation := AeroVideoPlaybackContract.validate_source(source)
+	if not validation.is_empty():
+		return validation
+	var cover_mode := _normalize_cover_mode_variant(source.get("cover_mode", DEFAULT_COVER_MODE))
+	var normalized_audio_level := _normalize_audio_level_variant(source.get("audio_level", DEFAULT_AUDIO_LEVEL))
+	if not COVER_MODES.has(cover_mode):
+		return {
+			"field": "cover_mode",
+			"message": "Video cover mode must be one of %s." % ", ".join(COVER_MODES),
+			"source": source.duplicate(true),
+		}
+	if normalized_audio_level < 0.0 or normalized_audio_level > 1.0:
+		return {
+			"field": "audio_level",
+			"message": "Video audio level must stay within 0.0 and 1.0.",
+			"source": source.duplicate(true),
+		}
+	return {}
 
 func _ensure_loaded_for_slot(slot_name: String, message: String) -> bool:
 	var session := _ensure_slot(slot_name)
@@ -514,6 +608,8 @@ func _ensure_slot(slot_name: String) -> Dictionary:
 			"last_error": {},
 			"has_loaded_media": false,
 			"surface": null,
+			"cover_mode": DEFAULT_COVER_MODE,
+			"audio_level": DEFAULT_AUDIO_LEVEL,
 		}
 		var created_backend: AeroVideoPlayerBackend = _slots[normalized_slot].get("backend", null) as AeroVideoPlayerBackend
 		_slots[normalized_slot]["backend_name"] = _resolve_backend_name(created_backend)
@@ -554,6 +650,8 @@ func _prepare_source_for_slot(source: Dictionary, slot_name: String) -> Dictiona
 		prepared_source.merge(seeded_source, true)
 	prepared_source.merge(source.duplicate(true), true)
 	prepared_source["slot"] = slot_name
+	prepared_source["cover_mode"] = _normalize_cover_mode_variant(prepared_source.get("cover_mode", session.get("cover_mode", DEFAULT_COVER_MODE)))
+	prepared_source["audio_level"] = _normalize_audio_level_variant(prepared_source.get("audio_level", session.get("audio_level", DEFAULT_AUDIO_LEVEL)))
 	return prepared_source
 
 func _slot_state_name(slot_name: String) -> String:
@@ -565,6 +663,13 @@ func _state_changed_for_slot(slot_name: String, detail: Dictionary) -> void:
 	if slot_name == _active_slot:
 		state_changed.emit(state_name, detail.duplicate(true))
 	slot_state_changed.emit(slot_name, state_name, detail.duplicate(true))
+
+func _normalize_cover_mode_variant(value: Variant) -> String:
+	var normalized := String(value).strip_edges().to_lower()
+	return normalized if COVER_MODES.has(normalized) else DEFAULT_COVER_MODE
+
+func _normalize_audio_level_variant(value: Variant) -> float:
+	return clampf(float(value), 0.0, 1.0)
 
 static func _normalize_slot_name(slot_name: String) -> String:
 	var normalized := slot_name.strip_edges()

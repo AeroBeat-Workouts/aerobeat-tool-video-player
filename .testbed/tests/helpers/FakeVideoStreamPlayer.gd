@@ -1,4 +1,4 @@
-extends Node
+extends Control
 
 var playing: bool = false
 var paused: bool = false
@@ -10,6 +10,8 @@ var volume: float = 1.0
 var volume_db: float = 0.0
 var stream: Variant = null
 var last_source_descriptor: Dictionary = {}
+var cover_mode: String = "contain"
+var audio_level: float = 1.0
 
 func play() -> void:
 	playing = true

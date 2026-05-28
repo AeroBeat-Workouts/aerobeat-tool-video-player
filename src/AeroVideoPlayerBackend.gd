@@ -30,6 +30,12 @@ func set_loop(_enabled: bool) -> Dictionary:
 func set_rate(_rate: float) -> Dictionary:
 	return _unsupported("set_rate")
 
+func set_cover_mode(_cover_mode: String) -> Dictionary:
+	return _unsupported("set_cover_mode")
+
+func set_audio_level(_audio_level: float) -> Dictionary:
+	return _unsupported("set_audio_level")
+
 func get_state() -> Dictionary:
 	return CoreContract.build_state_snapshot()
 

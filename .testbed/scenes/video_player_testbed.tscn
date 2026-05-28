@@ -72,7 +72,7 @@ text = "Backend: pending"
 [node name="LeftPlaybackLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Playback: idle | Loop: off"
+text = "Playback: idle | Loop: off | Cover: contain | Audio: 100%"
 
 [node name="Metrics" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
@@ -92,6 +92,40 @@ text = "Duration: 00:00.00"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Loop"
+
+[node name="LeftCoverRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CoverLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow"]
+layout_mode = 2
+text = "Cover"
+
+[node name="LeftCoverOptionButton" type="OptionButton" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LeftAudioRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AudioLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
+layout_mode = 2
+text = "Audio"
+
+[node name="LeftAudioSlider" type="HSlider" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="LeftAudioValueLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "100%"
 
 [node name="SeekRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
@@ -175,7 +209,7 @@ text = "Backend: pending"
 [node name="RightPlaybackLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Playback: idle | Loop: off"
+text = "Playback: idle | Loop: off | Cover: contain | Audio: 100%"
 
 [node name="Metrics" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
@@ -195,6 +229,40 @@ text = "Duration: 00:00.00"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Loop"
+
+[node name="RightCoverRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CoverLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightCoverRow"]
+layout_mode = 2
+text = "Cover"
+
+[node name="RightCoverOptionButton" type="OptionButton" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightCoverRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightAudioRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AudioLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
+layout_mode = 2
+text = "Audio"
+
+[node name="RightAudioSlider" type="HSlider" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="RightAudioValueLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "100%"
 
 [node name="SeekRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
@@ -253,6 +321,8 @@ layout_mode = 2
 text = "Unload"
 
 [connection signal="toggled" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftLoopCheckBox" to="." method="_on_left_loop_check_box_toggled"]
+[connection signal="item_selected" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow/LeftCoverOptionButton" to="." method="_on_left_cover_option_button_item_selected"]
+[connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow/LeftAudioSlider" to="." method="_on_left_audio_slider_value_changed"]
 [connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekBackButton" to="." method="_on_left_seek_back_button_pressed"]
 [connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekSlider" to="." method="_on_left_seek_slider_value_changed"]
 [connection signal="drag_ended" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekSlider" to="." method="_on_left_seek_slider_drag_ended"]
@@ -263,6 +333,8 @@ text = "Unload"
 [connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftStopButton" to="." method="_on_left_stop_button_pressed"]
 [connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftUnloadButton" to="." method="_on_left_unload_button_pressed"]
 [connection signal="toggled" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightLoopCheckBox" to="." method="_on_right_loop_check_box_toggled"]
+[connection signal="item_selected" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightCoverRow/RightCoverOptionButton" to="." method="_on_right_cover_option_button_item_selected"]
+[connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow/RightAudioSlider" to="." method="_on_right_audio_slider_value_changed"]
 [connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekBackButton" to="." method="_on_right_seek_back_button_pressed"]
 [connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekSlider" to="." method="_on_right_seek_slider_value_changed"]
 [connection signal="drag_ended" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekSlider" to="." method="_on_right_seek_slider_drag_ended"]
