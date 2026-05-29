@@ -23,326 +23,357 @@ theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 24
 
-[node name="VBox" type="VBoxContainer" parent="MarginContainer"]
+[node name="Scroll" type="ScrollContainer" parent="MarginContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 12
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/VBox"]
+[node name="TitleLabel" type="Label" parent="MarginContainer/Scroll/VBox"]
 layout_mode = 2
+autowrap_mode = 3
 text = "AeroVideoPlayerManager .ogv proving surface (two-slot)"
 
-[node name="StatusLabel" type="Label" parent="MarginContainer/VBox"]
+[node name="StatusLabel" type="Label" parent="MarginContainer/Scroll/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "Status: booting"
 
-[node name="ActiveSlotLabel" type="Label" parent="MarginContainer/VBox"]
+[node name="ActiveSlotLabel" type="Label" parent="MarginContainer/Scroll/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "Active slot: primary"
 
-[node name="SlotsRow" type="HBoxContainer" parent="MarginContainer/VBox"]
+[node name="SlotsRow" type="BoxContainer" parent="MarginContainer/Scroll/VBox"]
+unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 16
 
-[node name="LeftPanel" type="PanelContainer" parent="MarginContainer/VBox/SlotsRow"]
+[node name="LeftPanel" type="PanelContainer" parent="MarginContainer/Scroll/VBox/SlotsRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel"]
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SlotTitle" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="SlotTitle" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
 text = "Left slot"
 
-[node name="LeftPathLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="LeftPathLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "res://assets/videos/calm_blue_sea_1.ogv"
 
-[node name="LeftBackendLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="LeftBackendLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "Backend: pending"
 
-[node name="LeftPlaybackLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="LeftPlaybackLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "Playback: idle | Loop: off | Cover: contain | Audio: 100%"
 
-[node name="Metrics" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="Metrics" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="LeftPositionLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Metrics"]
+[node name="LeftPositionLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Metrics"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Position: 00:00.00"
 
-[node name="LeftDurationLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Metrics"]
+[node name="LeftDurationLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Metrics"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Duration: 00:00.00"
 
-[node name="LeftLoopCheckBox" type="CheckBox" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="LeftLoopCheckBox" type="CheckBox" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Loop"
 
-[node name="LeftCoverRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="LeftCoverRow" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="LeftCoverLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow"]
+[node name="LeftCoverLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow"]
 layout_mode = 2
 text = "Cover"
 
-[node name="LeftCoverModeOption" type="OptionButton" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow"]
+[node name="LeftCoverModeOption" type="OptionButton" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="LeftAudioRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="LeftAudioRow" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="LeftAudioLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
+[node name="LeftAudioLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
 layout_mode = 2
 text = "Audio"
 
-[node name="LeftAudioLevelSlider" type="HSlider" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
+[node name="LeftAudioLevelSlider" type="HSlider" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
+custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
 step = 0.01
 value = 1.0
 
-[node name="LeftAudioLevelValueLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
+[node name="LeftAudioLevelValueLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "100%"
 
-[node name="SeekRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
+[node name="SeekRow" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="LeftSeekBackButton" type="Button" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
+[node name="LeftSeekBackButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
 layout_mode = 2
 text = "-5s"
 
-[node name="LeftSeekSlider" type="HSlider" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
+[node name="LeftSeekSlider" type="HSlider" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 0)
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
 step = 0.01
 
-[node name="LeftSeekForwardButton" type="Button" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
+[node name="LeftSeekForwardButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
 layout_mode = 2
 text = "+5s"
 
-[node name="LeftSeekValueLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
+[node name="LeftSeekValueLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "00:00.00"
 
-[node name="LeftSurface" type="ColorRect" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(480, 270)
-layout_mode = 2
-size_flags_vertical = 3
-color = Color(0.05, 0.08, 0.12, 1)
-
-[node name="Buttons" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="LeftLoadButton" type="Button" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
-layout_mode = 2
-text = "Load"
-
-[node name="LeftPlayButton" type="Button" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
-layout_mode = 2
-text = "Play"
-
-[node name="LeftPauseButton" type="Button" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
-layout_mode = 2
-text = "Pause"
-
-[node name="LeftStopButton" type="Button" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
-layout_mode = 2
-text = "Stop"
-
-[node name="LeftUnloadButton" type="Button" parent="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
-layout_mode = 2
-text = "Unload"
-
-[node name="RightPanel" type="PanelContainer" parent="MarginContainer/VBox/SlotsRow"]
+[node name="LeftSurfacePanel" type="PanelContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
+custom_minimum_size = Vector2(320, 180)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel"]
+[node name="LeftSurface" type="VideoStreamPlayer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftSurfacePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+expand = true
+
+[node name="Buttons" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SlotTitle" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="LeftLoadButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
+layout_mode = 2
+text = "Load"
+
+[node name="LeftPlayButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
+layout_mode = 2
+text = "Play"
+
+[node name="LeftPauseButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
+layout_mode = 2
+text = "Pause"
+
+[node name="LeftStopButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
+layout_mode = 2
+text = "Stop"
+
+[node name="LeftUnloadButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons"]
+layout_mode = 2
+text = "Unload"
+
+[node name="RightPanel" type="PanelContainer" parent="MarginContainer/Scroll/VBox/SlotsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SlotTitle" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
 text = "Right slot"
 
-[node name="RightPathLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="RightPathLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "res://assets/videos/calm_blue_sea_1.ogv"
 
-[node name="RightBackendLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="RightBackendLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "Backend: pending"
 
-[node name="RightPlaybackLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="RightPlaybackLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 3
 text = "Playback: idle | Loop: off | Cover: contain | Audio: 100%"
 
-[node name="Metrics" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="Metrics" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="RightPositionLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Metrics"]
+[node name="RightPositionLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Metrics"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Position: 00:00.00"
 
-[node name="RightDurationLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Metrics"]
+[node name="RightDurationLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Metrics"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Duration: 00:00.00"
 
-[node name="RightLoopCheckBox" type="CheckBox" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="RightLoopCheckBox" type="CheckBox" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Loop"
 
-[node name="RightCoverRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="RightCoverRow" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="RightCoverLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightCoverRow"]
+[node name="RightCoverLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightCoverRow"]
 layout_mode = 2
 text = "Cover"
 
-[node name="RightCoverModeOption" type="OptionButton" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightCoverRow"]
+[node name="RightCoverModeOption" type="OptionButton" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightCoverRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="RightAudioRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="RightAudioRow" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="RightAudioLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
+[node name="RightAudioLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
 layout_mode = 2
 text = "Audio"
 
-[node name="RightAudioLevelSlider" type="HSlider" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
+[node name="RightAudioLevelSlider" type="HSlider" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
+custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
 step = 0.01
 value = 1.0
 
-[node name="RightAudioLevelValueLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
+[node name="RightAudioLevelValueLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightAudioRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "100%"
 
-[node name="SeekRow" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="SeekRow" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="RightSeekBackButton" type="Button" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
+[node name="RightSeekBackButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
 layout_mode = 2
 text = "-5s"
 
-[node name="RightSeekSlider" type="HSlider" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
+[node name="RightSeekSlider" type="HSlider" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 0)
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
 step = 0.01
 
-[node name="RightSeekForwardButton" type="Button" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
+[node name="RightSeekForwardButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
 layout_mode = 2
 text = "+5s"
 
-[node name="RightSeekValueLabel" type="Label" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
+[node name="RightSeekValueLabel" type="Label" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "00:00.00"
 
-[node name="RightSurface" type="ColorRect" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(480, 270)
+[node name="RightSurfacePanel" type="PanelContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
+custom_minimum_size = Vector2(320, 180)
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
-color = Color(0.07, 0.07, 0.11, 1)
 
-[node name="Buttons" type="HBoxContainer" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox"]
+[node name="RightSurface" type="VideoStreamPlayer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightSurfacePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+expand = true
+
+[node name="Buttons" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="RightLoadButton" type="Button" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons"]
+[node name="RightLoadButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons"]
 layout_mode = 2
 text = "Load"
 
-[node name="RightPlayButton" type="Button" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons"]
+[node name="RightPlayButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons"]
 layout_mode = 2
 text = "Play"
 
-[node name="RightPauseButton" type="Button" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons"]
+[node name="RightPauseButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons"]
 layout_mode = 2
 text = "Pause"
 
-[node name="RightStopButton" type="Button" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons"]
+[node name="RightStopButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons"]
 layout_mode = 2
 text = "Stop"
 
-[node name="RightUnloadButton" type="Button" parent="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons"]
+[node name="RightUnloadButton" type="Button" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons"]
 layout_mode = 2
 text = "Unload"
 
-[connection signal="toggled" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftLoopCheckBox" to="." method="_on_left_loop_check_box_toggled"]
-[connection signal="item_selected" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow/LeftCoverModeOption" to="." method="_on_left_cover_mode_option_item_selected"]
-[connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow/LeftAudioLevelSlider" to="." method="_on_left_audio_level_slider_value_changed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekBackButton" to="." method="_on_left_seek_back_button_pressed"]
-[connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekSlider" to="." method="_on_left_seek_slider_value_changed"]
-[connection signal="drag_ended" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekSlider" to="." method="_on_left_seek_slider_drag_ended"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekForwardButton" to="." method="_on_left_seek_forward_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftLoadButton" to="." method="_on_left_load_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftPlayButton" to="." method="_on_left_play_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftPauseButton" to="." method="_on_left_pause_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftStopButton" to="." method="_on_left_stop_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftUnloadButton" to="." method="_on_left_unload_button_pressed"]
-[connection signal="toggled" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightLoopCheckBox" to="." method="_on_right_loop_check_box_toggled"]
-[connection signal="item_selected" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightCoverRow/RightCoverModeOption" to="." method="_on_right_cover_mode_option_item_selected"]
-[connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/RightAudioRow/RightAudioLevelSlider" to="." method="_on_right_audio_level_slider_value_changed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekBackButton" to="." method="_on_right_seek_back_button_pressed"]
-[connection signal="value_changed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekSlider" to="." method="_on_right_seek_slider_value_changed"]
-[connection signal="drag_ended" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekSlider" to="." method="_on_right_seek_slider_drag_ended"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekForwardButton" to="." method="_on_right_seek_forward_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons/RightLoadButton" to="." method="_on_right_load_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons/RightPlayButton" to="." method="_on_right_play_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons/RightPauseButton" to="." method="_on_right_pause_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons/RightStopButton" to="." method="_on_right_stop_button_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/SlotsRow/RightPanel/VBox/Buttons/RightUnloadButton" to="." method="_on_right_unload_button_pressed"]
+[connection signal="toggled" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftLoopCheckBox" to="." method="_on_left_loop_check_box_toggled"]
+[connection signal="item_selected" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftCoverRow/LeftCoverModeOption" to="." method="_on_left_cover_mode_option_item_selected"]
+[connection signal="value_changed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftAudioRow/LeftAudioLevelSlider" to="." method="_on_left_audio_level_slider_value_changed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekBackButton" to="." method="_on_left_seek_back_button_pressed"]
+[connection signal="value_changed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekSlider" to="." method="_on_left_seek_slider_value_changed"]
+[connection signal="drag_ended" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekSlider" to="." method="_on_left_seek_slider_drag_ended"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/SeekRow/LeftSeekForwardButton" to="." method="_on_left_seek_forward_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftLoadButton" to="." method="_on_left_load_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftPlayButton" to="." method="_on_left_play_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftPauseButton" to="." method="_on_left_pause_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftStopButton" to="." method="_on_left_stop_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/Buttons/LeftUnloadButton" to="." method="_on_left_unload_button_pressed"]
+[connection signal="toggled" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightLoopCheckBox" to="." method="_on_right_loop_check_box_toggled"]
+[connection signal="item_selected" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightCoverRow/RightCoverModeOption" to="." method="_on_right_cover_mode_option_item_selected"]
+[connection signal="value_changed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightAudioRow/RightAudioLevelSlider" to="." method="_on_right_audio_level_slider_value_changed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekBackButton" to="." method="_on_right_seek_back_button_pressed"]
+[connection signal="value_changed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekSlider" to="." method="_on_right_seek_slider_value_changed"]
+[connection signal="drag_ended" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekSlider" to="." method="_on_right_seek_slider_drag_ended"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/SeekRow/RightSeekForwardButton" to="." method="_on_right_seek_forward_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons/RightLoadButton" to="." method="_on_right_load_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons/RightPlayButton" to="." method="_on_right_play_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons/RightPauseButton" to="." method="_on_right_pause_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons/RightStopButton" to="." method="_on_right_stop_button_pressed"]
+[connection signal="pressed" from="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/Buttons/RightUnloadButton" to="." method="_on_right_unload_button_pressed"]

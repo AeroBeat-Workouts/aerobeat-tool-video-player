@@ -5,6 +5,7 @@ const SAMPLE_VIDEO_PROJECT_PATH := "assets/videos/calm_blue_sea_1.ogv"
 const SAMPLE_DURATION_SECONDS := 28.693313
 const SAMPLE_REMOTE_URL := "https://example.com/path/to/video.ogv"
 const SEEK_STEP_SECONDS := 5.0
+const RESPONSIVE_STACK_BREAKPOINT := 1180.0
 const SLOT_LEFT := "left"
 const SLOT_RIGHT := "right"
 const SLOT_NAMES := [SLOT_LEFT, SLOT_RIGHT]
@@ -17,6 +18,7 @@ const GodotBackendScript := preload("res://addons/aerobeat-vendor-godot-video/sr
 
 @onready var status_label: Label = %StatusLabel
 @onready var active_slot_label: Label = %ActiveSlotLabel
+@onready var slots_row: BoxContainer = %SlotsRow
 @onready var slot_ui := {
 	SLOT_LEFT: {
 		"path_label": %LeftPathLabel,
@@ -66,6 +68,8 @@ var _external_sample_path: String = ""
 
 func _ready() -> void:
 	_prepare_external_sample()
+	resized.connect(_on_testbed_resized)
+	_update_responsive_layout()
 	for slot_name in SLOT_NAMES:
 		var ui: Dictionary = slot_ui.get(slot_name, {})
 		var path_label: Label = ui.get("path_label")
@@ -127,7 +131,7 @@ func _inject_source_controls(slot_name: String) -> void:
 	var surface: Control = ui.get("surface")
 	if surface == null:
 		return
-	var column := surface.get_parent() as VBoxContainer
+	var column := _find_slot_column(surface)
 	if column == null:
 		return
 	var path_label: Label = ui.get("path_label")
@@ -196,6 +200,22 @@ func _process(_delta: float) -> void:
 	for slot_name in SLOT_NAMES:
 		_sync_slot_ui(slot_name)
 	_sync_global_ui()
+
+func _on_testbed_resized() -> void:
+	_update_responsive_layout()
+
+func _update_responsive_layout() -> void:
+	if slots_row == null:
+		return
+	slots_row.vertical = size.x < RESPONSIVE_STACK_BREAKPOINT
+
+func _find_slot_column(surface: Control) -> VBoxContainer:
+	var current: Node = surface
+	while current != null:
+		if current is VBoxContainer:
+			return current as VBoxContainer
+		current = current.get_parent()
+	return null
 
 func _create_backend() -> AeroVideoPlayerBackend:
 	return GodotBackendScript.new()
