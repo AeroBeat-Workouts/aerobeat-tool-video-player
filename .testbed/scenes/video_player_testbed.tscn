@@ -175,12 +175,15 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="LeftSurface" type="VideoStreamPlayer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftSurfacePanel"]
+[node name="LeftSurface" type="Control" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox/LeftSurfacePanel"]
 unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-expand = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="Buttons" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/LeftPanel/VBox"]
 layout_mode = 2
@@ -322,12 +325,15 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="RightSurface" type="VideoStreamPlayer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightSurfacePanel"]
+[node name="RightSurface" type="Control" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox/RightSurfacePanel"]
 unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-expand = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="Buttons" type="HBoxContainer" parent="MarginContainer/Scroll/VBox/SlotsRow/RightPanel/VBox"]
 layout_mode = 2

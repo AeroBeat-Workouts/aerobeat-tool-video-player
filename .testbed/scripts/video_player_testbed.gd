@@ -14,7 +14,7 @@ const COVER_MODE_OPTIONS := [
 	AeroVideoPlayerManager.COVER_MODE_CONTAIN,
 	AeroVideoPlayerManager.COVER_MODE_COVER,
 ]
-const GodotBackendScript := preload("res://addons/aerobeat-vendor-godot-video/src/AeroGodotVideoBackend.gd")
+const GodotBackendBridgeScript := preload("res://addons/aerobeat-tool-video-player/src/AeroVideoPlayerGodotBackendBridge.gd")
 
 @onready var status_label: Label = %StatusLabel
 @onready var active_slot_label: Label = %ActiveSlotLabel
@@ -94,8 +94,8 @@ func _ready() -> void:
 		audio_value_label.text = _format_audio_level(AeroVideoPlayerManager.DEFAULT_AUDIO_LEVEL)
 		_inject_source_controls(slot_name)
 
-	_manager = AeroVideoPlayerManager.new()
-	_manager.set_backend_factory(Callable(self, "_create_backend"))
+	var backend_bridge := GodotBackendBridgeScript.new()
+	_manager = backend_bridge.create_manager()
 	add_child(_manager)
 	_manager.slot_state_changed.connect(_on_slot_state_changed)
 	_manager.slot_media_loaded.connect(_on_slot_media_loaded)
@@ -216,9 +216,6 @@ func _find_slot_column(surface: Control) -> VBoxContainer:
 			return current as VBoxContainer
 		current = current.get_parent()
 	return null
-
-func _create_backend() -> AeroVideoPlayerBackend:
-	return GodotBackendScript.new()
 
 func _load_project_source(slot_name: String) -> void:
 	_set_slot_source_input(slot_name, SAMPLE_VIDEO_PROJECT_PATH, SAMPLE_DURATION_SECONDS)

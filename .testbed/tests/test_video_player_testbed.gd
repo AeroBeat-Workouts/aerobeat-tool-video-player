@@ -13,6 +13,8 @@ func test_testbed_injects_arbitrary_source_inputs_and_clickable_timeline_seek() 
 	var left_ui: Dictionary = testbed.slot_ui.get(SLOT_LEFT, {})
 	assert_true(left_ui.has("source_input"), "Tool proving surface should expose a manual source input for arbitrary path loading")
 	assert_true(left_ui.has("duration_spin"), "Tool proving surface should expose a duration hint input for arbitrary source seeking")
+	assert_true(left_ui.get("surface") is Control, "Tool proving surface should bind each slot to a Control container so vendor cover math targets the slot bounds")
+	assert_eq(str(testbed._manager.get_backend(SLOT_LEFT).get_script().resource_path.get_file()), "AeroGodotVideoBackend.gd", "Tool proving surface should still route real playback through the injected Godot vendor backend via the repo-owned bridge")
 
 	var source_input: LineEdit = left_ui.get("source_input")
 	var duration_spin: SpinBox = left_ui.get("duration_spin")
