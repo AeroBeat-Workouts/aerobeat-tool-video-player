@@ -46,7 +46,7 @@ func _prepare_external_sample() -> void:
 	assert_eq(copy_error, OK, "Should copy the proven sample outside the project tree for remote-url coverage")
 
 func test_public_facade_exposes_stable_video_player_surface() -> void:
-	assert_eq(AeroVideoPlayerManager.VERSION, "0.5.0", "Version should reflect cover-mode + audio-level support")
+	assert_eq(AeroVideoPlayerManager.VERSION, "0.6.0", "Version should reflect fit-mode alignment + audio-level support")
 	assert_true(_manager.has_signal("state_changed"), "Public facade should expose state_changed")
 	assert_true(_manager.has_signal("position_changed"), "Public facade should expose position_changed")
 	assert_true(_manager.has_signal("media_loaded"), "Public facade should expose media_loaded")
@@ -72,7 +72,8 @@ func test_public_facade_exposes_stable_video_player_surface() -> void:
 	assert_true(_manager.has_method("seek"), "Public facade should expose seek")
 	assert_true(_manager.has_method("set_loop"), "Public facade should expose set_loop")
 	assert_true(_manager.has_method("set_rate"), "Public facade should expose set_rate")
-	assert_true(_manager.has_method("set_cover_mode"), "Public facade should expose set_cover_mode")
+	assert_true(_manager.has_method("set_fit_mode"), "Public facade should expose set_fit_mode")
+	assert_true(_manager.has_method("set_cover_mode"), "Compatibility seam should remain available for old callers")
 	assert_true(_manager.has_method("set_audio_level"), "Public facade should expose set_audio_level")
 	assert_true(_manager.has_method("attach_surface"), "Public facade should expose attach_surface")
 	assert_true(_manager.has_method("detach_surface"), "Public facade should expose detach_surface")
@@ -97,7 +98,7 @@ func test_normalize_source_delegates_to_shared_contract_and_adds_slots_cover_and
 	var source := {
 		"path": " res://assets/videos/calm_blue_sea_1.ogv ",
 		"autoplay": true,
-		"cover_mode": "cover",
+		"fit_mode": "cover",
 		"audio_level": 0.35,
 		"metadata": {
 			"slot": "right",
@@ -111,7 +112,8 @@ func test_normalize_source_delegates_to_shared_contract_and_adds_slots_cover_and
 	assert_eq(float(normalized.get("start_time", -1.0)), 0.0, "normalize_source should default start_time to zero")
 	assert_eq(float(normalized.get("rate", -1.0)), 1.0, "normalize_source should default rate to one")
 	assert_eq(String(normalized.get("slot", "")), "right", "normalize_source should resolve slots from metadata")
-	assert_eq(String(normalized.get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_COVER, "normalize_source should preserve supported cover modes")
+	assert_eq(String(normalized.get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_COVER, "normalize_source should preserve supported fit modes")
+	assert_eq(String(normalized.get("cover_mode", "")), AeroVideoPlayerManager.FIT_MODE_COVER, "normalize_source should mirror the compatibility alias for old callers")
 	assert_eq(float(normalized.get("audio_level", -1.0)), 0.35, "normalize_source should preserve audio level")
 
 func test_normalize_source_reclassifies_http_urls_as_remote_sources() -> void:
@@ -136,7 +138,7 @@ func test_primary_slot_transport_controls_preserve_existing_behavior_and_report_
 		"duration_hint": 120.0,
 		"start_time": 12.5,
 		"rate": 1.5,
-		"cover_mode": AeroVideoPlayerManager.COVER_MODE_COVER,
+		"fit_mode": AeroVideoPlayerManager.FIT_MODE_COVER,
 		"audio_level": 0.4,
 	})
 	assert_eq(states.slice(0, 2), [AeroVideoPlayerManager.STATE_LOADING, AeroVideoPlayerManager.STATE_READY], "load should move through loading into ready")
@@ -144,7 +146,7 @@ func test_primary_slot_transport_controls_preserve_existing_behavior_and_report_
 	assert_eq(String(loaded_payloads[0].get("slot", "")), AeroVideoPlayerManager.DEFAULT_SLOT, "legacy media_loaded should still point at the primary slot")
 	assert_eq(float(_manager.get_position()), 12.5, "load should honor start_time through seek")
 	assert_eq(float(_manager.get_duration()), 120.0, "get_duration should reflect fake backend media info")
-	assert_eq(String(_manager.get_state().get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_COVER, "cover mode should flow through load")
+	assert_eq(String(_manager.get_state().get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_COVER, "fit mode should flow through load")
 	assert_eq(float(_manager.get_state().get("audio_level", -1.0)), 0.4, "audio level should flow through load")
 
 	_manager.play()
@@ -158,24 +160,24 @@ func test_primary_slot_transport_controls_preserve_existing_behavior_and_report_
 	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_READY, "stop should return the contract to ready when media remains loaded")
 	assert_eq(float(_manager.get_position()), 0.0, "stop should reset position to zero")
 
-func test_cover_mode_and_audio_level_can_be_toggled_per_slot_before_and_after_load() -> void:
-	_manager.set_cover_mode(AeroVideoPlayerManager.COVER_MODE_STRETCH, "left")
+func test_fit_mode_and_audio_level_can_be_toggled_per_slot_before_and_after_load() -> void:
+	_manager.set_fit_mode(AeroVideoPlayerManager.FIT_MODE_STRETCH, "left")
 	_manager.set_audio_level(0.25, "left")
-	assert_eq(String(_manager.get_state("left").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_STRETCH, "set_cover_mode should seed cover mode before media is loaded")
+	assert_eq(String(_manager.get_state("left").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_STRETCH, "set_fit_mode should seed fit mode before media is loaded")
 	assert_eq(float(_manager.get_state("left").get("audio_level", -1.0)), 0.25, "set_audio_level should seed audio level before media is loaded")
-	assert_eq(String(_manager.get_state().get("cover_mode", "")), AeroVideoPlayerManager.DEFAULT_COVER_MODE, "left cover changes should not leak to primary")
+	assert_eq(String(_manager.get_state().get("fit_mode", "")), AeroVideoPlayerManager.DEFAULT_FIT_MODE, "left cover changes should not leak to primary")
 
 	_manager.load({
 		"path": SAMPLE_VIDEO_PATH,
 		"duration_hint": 42.0,
 		"slot": "left",
 	}, "left")
-	assert_eq(String(_manager.get_state("left").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_STRETCH, "pre-load cover mode should survive into the loaded slot")
+	assert_eq(String(_manager.get_state("left").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_STRETCH, "pre-load fit mode should survive into the loaded slot")
 	assert_eq(float(_manager.get_state("left").get("audio_level", -1.0)), 0.25, "pre-load audio level should survive into the loaded slot")
 
-	_manager.set_cover_mode(AeroVideoPlayerManager.COVER_MODE_COVER, "left")
+	_manager.set_fit_mode(AeroVideoPlayerManager.FIT_MODE_COVER, "left")
 	_manager.set_audio_level(0.9, "left")
-	assert_eq(String(_manager.get_state("left").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_COVER, "set_cover_mode should update the loaded slot independently")
+	assert_eq(String(_manager.get_state("left").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_COVER, "set_fit_mode should update the loaded slot independently")
 	assert_eq(float(_manager.get_state("left").get("audio_level", -1.0)), 0.9, "set_audio_level should update the loaded slot independently")
 
 func test_multi_slot_playback_state_surfaces_cover_and_audio_stay_independent() -> void:
@@ -195,7 +197,7 @@ func test_multi_slot_playback_state_surfaces_cover_and_audio_stay_independent() 
 		"duration_hint": 30.0,
 		"start_time": 2.5,
 		"loop": true,
-		"cover_mode": AeroVideoPlayerManager.COVER_MODE_COVER,
+		"fit_mode": AeroVideoPlayerManager.FIT_MODE_COVER,
 		"audio_level": 0.55,
 	}, "left")
 	_manager.load({
@@ -203,7 +205,7 @@ func test_multi_slot_playback_state_surfaces_cover_and_audio_stay_independent() 
 		"duration_hint": 75.0,
 		"start_time": 5.0,
 		"loop": false,
-		"cover_mode": AeroVideoPlayerManager.COVER_MODE_STRETCH,
+		"fit_mode": AeroVideoPlayerManager.FIT_MODE_STRETCH,
 		"audio_level": 0.15,
 	}, "right")
 	_manager.play("left")
@@ -219,8 +221,8 @@ func test_multi_slot_playback_state_surfaces_cover_and_audio_stay_independent() 
 	assert_eq(float(_manager.get_position("right")), 10.0, "right slot should preserve its own seek position")
 	assert_true(bool(_manager.get_state("left").get("loop", false)), "left slot should preserve its own loop flag")
 	assert_false(bool(_manager.get_state("right").get("loop", true)), "right slot should preserve its own loop flag")
-	assert_eq(String(_manager.get_state("left").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_COVER, "left slot should preserve its own cover mode")
-	assert_eq(String(_manager.get_state("right").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_STRETCH, "right slot should preserve its own cover mode")
+	assert_eq(String(_manager.get_state("left").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_COVER, "left slot should preserve its own fit mode")
+	assert_eq(String(_manager.get_state("right").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_STRETCH, "right slot should preserve its own fit mode")
 	assert_eq(float(_manager.get_state("left").get("audio_level", -1.0)), 0.55, "left slot should preserve its own audio level")
 	assert_eq(float(_manager.get_state("right").get("audio_level", -1.0)), 0.15, "right slot should preserve its own audio level")
 
@@ -249,15 +251,15 @@ func test_reset_and_unload_are_slot_scoped() -> void:
 
 	_manager.attach_surface(left_surface, "left")
 	_manager.attach_surface(right_surface, "right")
-	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "cover_mode": AeroVideoPlayerManager.COVER_MODE_COVER, "audio_level": 0.33}, "left")
-	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "cover_mode": AeroVideoPlayerManager.COVER_MODE_STRETCH, "audio_level": 0.8}, "right")
+	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "fit_mode": AeroVideoPlayerManager.FIT_MODE_COVER, "audio_level": 0.33}, "left")
+	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "fit_mode": AeroVideoPlayerManager.FIT_MODE_STRETCH, "audio_level": 0.8}, "right")
 	_manager.seek(8.0, "left")
 	_manager.seek(12.0, "right")
 
 	_manager.reset("left")
 	assert_eq(float(_manager.get_position("left")), 0.0, "reset should rewind only the targeted slot")
 	assert_eq(float(_manager.get_position("right")), 12.0, "reset should not rewind other slots")
-	assert_eq(String(_manager.get_state("left").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_COVER, "reset should preserve the targeted slot cover mode")
+	assert_eq(String(_manager.get_state("left").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_COVER, "reset should preserve the targeted slot fit mode")
 	assert_eq(float(_manager.get_state("right").get("audio_level", -1.0)), 0.8, "reset should not disturb other slot audio levels")
 
 	_manager.unload("right")
@@ -265,7 +267,7 @@ func test_reset_and_unload_are_slot_scoped() -> void:
 	assert_true(bool(_manager.get_state("right").get("surface_attached", false)), "unload should preserve the targeted slot surface binding for later reloads")
 	assert_eq(String(_manager.get_state("left").get("state", "")), AeroVideoPlayerManager.STATE_READY, "unload should not disturb other loaded slots")
 
-	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "cover_mode": AeroVideoPlayerManager.COVER_MODE_CONTAIN, "audio_level": 0.2}, "right")
+	_manager.load({"path": SAMPLE_VIDEO_PATH, "duration_hint": 20.0, "fit_mode": AeroVideoPlayerManager.FIT_MODE_CONTAIN, "audio_level": 0.2}, "right")
 	assert_eq(String(_manager.get_state("right").get("state", "")), AeroVideoPlayerManager.STATE_READY, "A slot should be reloadable after unload without reattaching its surface")
 	assert_true(bool(_manager.get_state("right").get("surface_attached", false)), "Reload after unload should still render through the preserved surface")
 
@@ -333,7 +335,7 @@ func test_manager_can_drive_multiple_vendor_backends_through_one_facade_with_cov
 		"path": SAMPLE_VIDEO_PATH,
 		"duration_hint": SAMPLE_DURATION_SECONDS,
 		"start_time": 3.25,
-		"cover_mode": AeroVideoPlayerManager.COVER_MODE_COVER,
+		"fit_mode": AeroVideoPlayerManager.FIT_MODE_COVER,
 		"audio_level": 0.6,
 		"metadata": {
 			"real_sample": true,
@@ -345,7 +347,7 @@ func test_manager_can_drive_multiple_vendor_backends_through_one_facade_with_cov
 		"duration_hint": SAMPLE_DURATION_SECONDS,
 		"start_time": 1.5,
 		"loop": true,
-		"cover_mode": AeroVideoPlayerManager.COVER_MODE_STRETCH,
+		"fit_mode": AeroVideoPlayerManager.FIT_MODE_STRETCH,
 		"audio_level": 0.2,
 	}, "right")
 	manager.seek(17.5, "left")
@@ -358,6 +360,6 @@ func test_manager_can_drive_multiple_vendor_backends_through_one_facade_with_cov
 	assert_eq(float(manager.get_duration("left")), SAMPLE_DURATION_SECONDS, "Truthful proving path should use the real sample duration hint")
 	assert_eq(float(manager.get_position("left")), 17.5, "Stable manager seek should flow through the injected vendor backend on the targeted slot")
 	assert_eq(float(manager.get_position("right")), 1.5, "A different vendor-backed slot should keep its own position")
-	assert_eq(String(manager.get_state("left").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_COVER, "Left slot should preserve its cover mode through the real backend")
-	assert_eq(String(manager.get_state("right").get("cover_mode", "")), AeroVideoPlayerManager.COVER_MODE_STRETCH, "Right slot should preserve its cover mode through the real backend")
+	assert_eq(String(manager.get_state("left").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_COVER, "Left slot should preserve its fit mode through the real backend")
+	assert_eq(String(manager.get_state("right").get("fit_mode", "")), AeroVideoPlayerManager.FIT_MODE_STRETCH, "Right slot should preserve its fit mode through the real backend")
 	assert_eq(float(manager.get_state("right").get("audio_level", -1.0)), 0.85, "Audio-level updates should flow through the real backend on the targeted slot")

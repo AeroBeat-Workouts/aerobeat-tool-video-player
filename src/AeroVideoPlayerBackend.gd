@@ -33,8 +33,11 @@ func set_loop(_enabled: bool) -> Dictionary:
 func set_rate(_rate: float) -> Dictionary:
 	return _unsupported("set_rate")
 
+func set_fit_mode(_fit_mode: String) -> Dictionary:
+	return _unsupported("set_fit_mode")
+
 func set_cover_mode(_cover_mode: String) -> Dictionary:
-	return _unsupported("set_cover_mode")
+	return set_fit_mode(_cover_mode)
 
 func set_audio_level(_audio_level: float) -> Dictionary:
 	return _unsupported("set_audio_level")

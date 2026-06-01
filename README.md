@@ -7,16 +7,14 @@ It should be read against the locked product direction from `aerobeat-docs`:
 - **Primary release target:** PC community first
 - **Official v1 gameplay features:** Boxing and Flow
 - **Official v1 gameplay input:** camera only
-- **Tool stance:** this repo owns generic playback lifecycle, time, surface binding, and backend abstraction rather than camera-tracking-specific replay logic
+- **Tool stance:** this repo owns generic playback lifecycle, time, surface binding, fit-mode control, and backend abstraction rather than camera-tracking-specific replay logic
 - **Replay ownership split:** replay consumers such as camera tracking should consume this tool's stable playback contract instead of re-implementing generic play/pause/seek/surface ownership
 
 ## Current facade scope
 
-The sharable package surface now centers on `src/AeroVideoPlayerManager.gd`.
+The sharable package surface centers on `src/AeroVideoPlayerManager.gd`.
 
 `AeroVideoPlayerManager` is the stable public facade for downstream tool consumers. It keeps the higher-level playback lifecycle signals and state transitions in this repo while consuming the shared vocabulary from `aerobeat-tool-core`.
-
-The current implementation exposes a slot-aware playback surface while preserving the original no-argument `primary` slot behavior.
 
 The current implementation exposes:
 
@@ -24,12 +22,29 @@ The current implementation exposes:
 - dedicated shared lifecycle APIs for `reset()` (soft recovery/reuse) and `unload()` (hard teardown)
 - legacy playback signals for the active slot (`state_changed`, `position_changed`, `media_loaded`, `playback_finished`, `error_raised`)
 - slot-aware signals for independent multi-video control (`slot_state_changed`, `slot_position_changed`, `slot_media_loaded`, `slot_playback_finished`, `slot_error_raised`)
-- source normalization helpers for the current dictionary contract (`path`, `kind`, `slot`, `loop`, `autoplay`, `start_time`, `rate`)
-- loop enable/disable support before or after load through the tool abstraction
-- multi-slot helpers such as `set_active_slot()`, `get_slot_names()`, `attach_slot_surface()`, `detach_slot_surface()`, and slot-targeted `load` / `play` / `pause` / `stop` / `seek` / `set_loop` / `set_rate`
+- source normalization helpers for the current dictionary contract (`path`, `kind`, `slot`, `loop`, `autoplay`, `start_time`, `rate`, `fit_mode`, `audio_level`)
+- multi-slot helpers such as `set_active_slot()`, `get_slot_names()`, `attach_slot_surface()`, `detach_slot_surface()`, and slot-targeted `load` / `play` / `pause` / `stop` / `seek` / `set_loop` / `set_rate` / `set_fit_mode`
 - a backend injection boundary via `src/AeroVideoPlayerBackend.gd`
 - a deterministic fake backend used by repo-local tests and the hidden `.testbed/` workbench
 - the output-surface attach/detach contract needed by replay and presentation consumers
+
+## Fit-mode contract
+
+This repo now standardizes on the shared 3-state `fit_mode` contract:
+
+- `stretch`
+- `contain`
+- `cover`
+
+### Temporary compatibility seam
+
+This facade still accepts and emits `cover_mode`, and still exposes `set_cover_mode(...)` as an alias, because downstream repos outside this slice have not all migrated yet.
+
+The seam is intentionally narrow:
+
+- canonical public fields/methods are `fit_mode` / `set_fit_mode(...)`
+- returned state/media payloads also include `cover_mode` as a mirrored alias for old callers
+- new code in this repo should use `fit_mode` only
 
 ## Shared contract ownership split
 
@@ -39,18 +54,15 @@ The current implementation exposes:
 
 ## Repo-local proving surface
 
-The hidden `.testbed/` workbench now includes a real `.ogv` proving surface.
+The hidden `.testbed/` workbench includes a real `.ogv` proving surface.
 
 - `.testbed/assets/videos/calm_blue_sea_1.ogv` reuses the proven environment-lane sample.
-- `.testbed/scenes/video_player_testbed.tscn` now provides a repo-local two-slot manual smoke scene with independent load / play / pause / stop / seek / unload / loop controls for `left` and `right` video slots.
-- `.testbed/scripts/video_player_testbed.gd` wires the stable public facade into that scene through direct injection of the real `aerobeat-vendor-godot-video` backend, so manual proving follows the real backend path instead of the default fake backend.
-- Each slot now exposes manual source input plus quick presets for package-relative paths inside the Godot project, copied absolute device paths outside the project, and URL entry, along with a duration-hint input so arbitrary sources can still drive the timeline honestly.
-- The proving HUD displays per-slot backend, state, position, duration, resolved playback path, and loop state so humans can exercise multi-video control through the tool abstraction rather than talking to the vendor layer directly.
-- The seek sliders are the clickable timelines for both slots, and the shipped sample preset uses the truthful `28.693313s` duration hint so humans can verify seek behavior against the real clip.
+- `.testbed/scenes/video_player_testbed.tscn` provides a repo-local two-slot manual smoke scene with independent load / play / pause / stop / seek / unload / loop / fit-mode controls for `left` and `right` video slots.
+- `.testbed/scripts/video_player_testbed.gd` wires the stable public facade into that scene through the tool-owned `AeroVideoPlayerGodotBackendBridge`, so manual proving follows the real backend path instead of the default fake backend.
+- Each slot exposes manual source input plus quick presets for package-relative paths inside the Godot project, copied absolute device paths outside the project, and URL entry, along with a duration-hint input so arbitrary sources can still drive the timeline honestly.
+- The proving HUD displays per-slot backend, state, position, duration, resolved playback path, loop state, fit mode, and audio level so humans can exercise multi-video control through the tool abstraction rather than talking to the vendor layer directly.
 
-This keeps the repo honest about the primary first verified media target while still letting the facade stay backend-injection-friendly.
-
-## 📋 Repository Details
+## Repository details
 
 - **Type:** Video playback tool package
 - **License:** **Mozilla Public License 2.0 (MPL 2.0)**
@@ -112,12 +124,3 @@ godot --headless --path .testbed --script addons/gut/gut_cmdln.gd \
   -ginclude_subdirs \
   -gexit
 ```
-
-### Validation notes
-
-- `.testbed/addons.jsonc` is the committed dev/test dependency contract.
-- The manifest intentionally stays narrow: `aerobeat-tool-core`, `aerobeat-vendor-godot-video`, and `gut`.
-- The fake backend remains the deterministic automated unit-test default for the public facade.
-- The hidden manual proving scene now injects the real Godot vendor backend so load / play / pause / stop / seek / loop verification does not silently fall back to the fake backend.
-- Loop and multi-slot behavior are covered in repo-local automated tests as well as the hidden two-slot proving scene.
-- The hidden testbed also carries a real `.ogv` manual smoke asset so the repo proves the verified first media target without inventing a new fixture.
