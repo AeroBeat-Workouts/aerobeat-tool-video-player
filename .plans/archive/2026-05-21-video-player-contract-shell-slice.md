@@ -1,7 +1,7 @@
 # AeroBeat Tool Video Player — Contract Shell Slice
 
 **Date:** 2026-05-21  
-**Status:** In Progress  
+**Status:** Stale  
 **Agent:** Cookie 🍪
 
 ---
