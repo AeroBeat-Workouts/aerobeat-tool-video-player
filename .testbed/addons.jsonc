@@ -1,26 +1,26 @@
 {
   "$schema": "https://chickensoft.games/schemas/addons.schema.json",
   "addons": {
-    // Install this repo into the hidden workbench the same way a consumer does.
     "aerobeat-tool-video-player": {
       "url": "..",
       "source": "symlink",
       "subfolder": "/"
     },
-    // Tool-template bootstrap pins the shared tool/workflow contract.
-    // `main` is intentional until aerobeat-tool-core starts tagging releases.
     "aerobeat-tool-core": {
-      "url": "git@github.com:AeroBeat-Workouts/aerobeat-tool-core.git",
-      "checkout": "main",
-      "subfolder": "/"
+      "url": "../../aerobeat-tool-core",
+      "subfolder": "/",
+      "source": "symlink"
     },
-    // Truthful manual proving uses the real Godot video backend via backend injection.
     "aerobeat-vendor-godot-video": {
-      "url": "git@github.com:AeroBeat-Workouts/aerobeat-vendor-godot-video.git",
-      "checkout": "main",
-      "subfolder": "/"
+      "url": "../../aerobeat-vendor-godot-video",
+      "subfolder": "/",
+      "source": "symlink"
     },
-    // GUT drives the repo-local test suite inside the hidden testbed/workbench.
+    "aerobeat-tool-headless-manager": {
+      "url": "../../aerobeat-tool-headless-manager",
+      "subfolder": "/",
+      "source": "symlink"
+    },
     "gut": {
       "url": "git@github.com:bitwes/Gut.git",
       "checkout": "main",
