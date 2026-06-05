@@ -24,6 +24,7 @@ The current implementation exposes:
 - slot-aware signals for independent multi-video control (`slot_state_changed`, `slot_position_changed`, `slot_media_loaded`, `slot_playback_finished`, `slot_error_raised`)
 - source normalization helpers for the current dictionary contract (`path`, `kind`, `slot`, `loop`, `autoplay`, `start_time`, `rate`, `fit_mode`, `audio_level`)
 - multi-slot helpers such as `set_active_slot()`, `get_slot_names()`, `attach_slot_surface()`, `detach_slot_surface()`, and slot-targeted `load` / `play` / `pause` / `stop` / `seek` / `set_loop` / `set_rate` / `set_fit_mode`
+- explicit transport introspection and frame-addressed APIs via `get_transport_capabilities()`, `get_transport_status()`, `step_frames(...)`, and `seek_to_frame(...)`
 - a backend injection boundary via `src/AeroVideoPlayerBackend.gd`
 - a deterministic fake backend used by repo-local tests and the hidden `.testbed/` workbench
 - the output-surface attach/detach contract needed by replay and presentation consumers
@@ -45,6 +46,16 @@ The seam is intentionally narrow:
 - canonical public fields/methods are `fit_mode` / `set_fit_mode(...)`
 - returned state/media payloads also include `cover_mode` as a mirrored alias for old callers
 - new code in this repo should use `fit_mode` only
+
+## Truthful transport contract
+
+The playback facade now exposes a transport contract that distinguishes between:
+
+- `exact_decoded_frame`
+- `exact_owned_frame_index`
+- `approx_time_seek`
+
+The repo-local fake backend reports `exact_owned_frame_index` so tests can exercise exact frame-addressed control honestly. The current injected Godot `.ogv` path reports `approx_time_seek` and explicitly refuses `step_frames(...)` / `seek_to_frame(...)` rather than pretending timestamp seeks are exact frame steps.
 
 ## Shared contract ownership split
 

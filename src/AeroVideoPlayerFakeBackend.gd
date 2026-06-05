@@ -6,6 +6,7 @@ const FIT_MODE_CONTAIN := "contain"
 const FIT_MODE_COVER := "cover"
 const FIT_MODES := [FIT_MODE_STRETCH, FIT_MODE_CONTAIN, FIT_MODE_COVER]
 const DEFAULT_FIT_MODE := FIT_MODE_COVER
+const DEFAULT_NOMINAL_FPS := 30.0
 
 var _state: String = AeroVideoPlaybackContract.STATE_IDLE
 var _source: Dictionary = {}
@@ -18,6 +19,10 @@ var _fit_mode: String = DEFAULT_FIT_MODE
 var _audio_level: float = 1.0
 var _surface: Node = null
 var _last_error: Dictionary = {}
+var _nominal_fps: float = DEFAULT_NOMINAL_FPS
+var _frame_duration_sec: float = 1.0 / DEFAULT_NOMINAL_FPS
+var _frame_count: int = 0
+var _frame_index: int = 0
 
 func load(source: Dictionary) -> Dictionary:
 	_state = AeroVideoPlaybackContract.STATE_LOADING
@@ -30,7 +35,11 @@ func load(source: Dictionary) -> Dictionary:
 	_loop_enabled = bool(_source.get("loop", false))
 	_rate = float(_source.get("rate", 1.0))
 	_duration_seconds = maxf(0.0, float(_source.get("duration_hint", 60.0)))
+	_nominal_fps = maxf(0.001, float(_source.get("nominal_fps", _source.get("fps_hint", DEFAULT_NOMINAL_FPS))))
+	_frame_duration_sec = 1.0 / _nominal_fps
+	_frame_count = max(0, int(ceili(_duration_seconds * _nominal_fps)))
 	_position_seconds = clampf(float(_source.get("start_time", 0.0)), 0.0, _duration_seconds)
+	_frame_index = _position_to_frame_index(_position_seconds)
 	_media_info = {
 		"path": String(_source.get("path", "")),
 		"duration": _duration_seconds,
@@ -41,6 +50,9 @@ func load(source: Dictionary) -> Dictionary:
 		"fit_mode": _fit_mode,
 		"cover_mode": _fit_mode,
 		"audio": get_audio_state(),
+		"nominal_fps": _nominal_fps,
+		"frame_duration_sec": _frame_duration_sec,
+		"frame_count": _frame_count,
 	}
 	_state = AeroVideoPlaybackContract.STATE_READY
 	_last_error = {}
@@ -62,9 +74,11 @@ func stop() -> Dictionary:
 	if _source.is_empty():
 		_state = AeroVideoPlaybackContract.STATE_IDLE
 		_position_seconds = 0.0
+		_frame_index = 0
 		return AeroVideoPlaybackContract.ok({"state": _state})
 	_state = AeroVideoPlaybackContract.STATE_READY
 	_position_seconds = 0.0
+	_frame_index = 0
 	return AeroVideoPlaybackContract.ok({"state": _state})
 
 func unload() -> Dictionary:
@@ -76,6 +90,10 @@ func unload() -> Dictionary:
 	_rate = 1.0
 	_state = AeroVideoPlaybackContract.STATE_IDLE
 	_last_error = {}
+	_nominal_fps = DEFAULT_NOMINAL_FPS
+	_frame_duration_sec = 1.0 / DEFAULT_NOMINAL_FPS
+	_frame_count = 0
+	_frame_index = 0
 	return AeroVideoPlaybackContract.ok({
 		"state": _state,
 		"surface_attached": _surface != null,
@@ -86,7 +104,8 @@ func seek(seconds: float) -> Dictionary:
 	if _source.is_empty():
 		return _fail("backend_not_ready", "Cannot seek before media has been loaded.")
 	_position_seconds = clampf(seconds, 0.0, _duration_seconds)
-	return AeroVideoPlaybackContract.ok({"state": _state, "position": _position_seconds})
+	_frame_index = _position_to_frame_index(_position_seconds)
+	return AeroVideoPlaybackContract.ok({"state": _state, "position": _position_seconds, "frame_index": _frame_index})
 
 func set_loop(enabled: bool) -> Dictionary:
 	_loop_enabled = enabled
@@ -152,7 +171,67 @@ func get_media_info() -> Dictionary:
 	info["fit_mode"] = _fit_mode
 	info["cover_mode"] = _fit_mode
 	info["audio"] = get_audio_state()
+	info["nominal_fps"] = _nominal_fps
+	info["frame_duration_sec"] = _frame_duration_sec
+	info["frame_count"] = _frame_count
 	return info
+
+func get_transport_capabilities() -> Dictionary:
+	return {
+		"transport_mode": TRANSPORT_MODE_EXACT_OWNED_FRAME_INDEX,
+		"can_step_forward": not _source.is_empty(),
+		"can_step_backward": not _source.is_empty(),
+		"can_seek_frame": not _source.is_empty(),
+		"nominal_fps": _nominal_fps,
+		"frame_duration_sec": _frame_duration_sec,
+		"exactness_note": "Fake backend owns a synthetic frame index timeline and can step it exactly.",
+		"limitation_code": "",
+	}
+
+func get_transport_status() -> Dictionary:
+	var state := get_state()
+	var capabilities := get_transport_capabilities()
+	return {
+		"transport_mode": capabilities.get("transport_mode", TRANSPORT_MODE_EXACT_OWNED_FRAME_INDEX),
+		"can_step_forward": bool(capabilities.get("can_step_forward", false)),
+		"can_step_backward": bool(capabilities.get("can_step_backward", false)),
+		"can_seek_frame": bool(capabilities.get("can_seek_frame", false)),
+		"frame_index": _frame_index if not _source.is_empty() else null,
+		"frame_count": _frame_count if not _source.is_empty() else null,
+		"nominal_fps": _nominal_fps if not _source.is_empty() else null,
+		"frame_duration_sec": _frame_duration_sec if not _source.is_empty() else null,
+		"paused": str(state.get("state", "")) == AeroVideoPlaybackContract.STATE_PAUSED,
+		"position_sec": _position_seconds,
+		"duration_sec": _duration_seconds,
+		"exactness_note": capabilities.get("exactness_note", ""),
+		"limitation_code": capabilities.get("limitation_code", ""),
+	}
+
+func step_frames(delta_frames: int) -> Dictionary:
+	if _source.is_empty():
+		return _fail("backend_not_ready", "Cannot step frames before media has been loaded.")
+	var target_index := _frame_index + delta_frames
+	if _frame_count > 0:
+		target_index = clampi(target_index, 0, _frame_count - 1)
+	else:
+		target_index = max(0, target_index)
+	return seek_to_frame(target_index)
+
+func seek_to_frame(frame_index: int) -> Dictionary:
+	if _source.is_empty():
+		return _fail("backend_not_ready", "Cannot seek to a frame before media has been loaded.")
+	if frame_index < 0:
+		return _fail("backend_invalid_frame_index", "Frame index must be zero or greater.", {"frame_index": frame_index})
+	var max_index := max(0, _frame_count - 1)
+	_frame_index = clampi(frame_index, 0, max_index)
+	_position_seconds = _frame_index_to_position(_frame_index)
+	return AeroVideoPlaybackContract.ok({
+		"frame_index": _frame_index,
+		"frame_count": _frame_count,
+		"position": _position_seconds,
+		"state": _state,
+		"transport_mode": TRANSPORT_MODE_EXACT_OWNED_FRAME_INDEX,
+	})
 
 func attach_surface(node: Node) -> Dictionary:
 	if node == null:
@@ -173,6 +252,19 @@ func _normalize_fit_mode(value: Variant) -> String:
 
 func _normalize_audio_level(value: Variant) -> float:
 	return clampf(float(value), 0.0, 1.0)
+
+func _position_to_frame_index(position_sec: float) -> int:
+	if _frame_count <= 0:
+		return 0
+	return clampi(int(round(position_sec * _nominal_fps)), 0, _frame_count - 1)
+
+func _frame_index_to_position(frame_index: int) -> float:
+	if frame_index <= 0:
+		return 0.0
+	var position := float(frame_index) * _frame_duration_sec
+	if _duration_seconds > 0.0:
+		position = minf(position, _duration_seconds)
+	return position
 
 func _fake_volume_db(level: float) -> float:
 	if level <= 0.0:

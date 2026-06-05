@@ -46,7 +46,7 @@ func _prepare_external_sample() -> void:
 	assert_eq(copy_error, OK, "Should copy the proven sample outside the project tree for remote-url coverage")
 
 func test_public_facade_exposes_stable_video_player_surface() -> void:
-	assert_eq(AeroVideoPlayerManager.VERSION, "0.6.0", "Version should reflect fit-mode alignment + audio-level support")
+	assert_eq(AeroVideoPlayerManager.VERSION, "0.7.0", "Version should reflect the truthful transport contract addition")
 	assert_true(_manager.has_signal("state_changed"), "Public facade should expose state_changed")
 	assert_true(_manager.has_signal("position_changed"), "Public facade should expose position_changed")
 	assert_true(_manager.has_signal("media_loaded"), "Public facade should expose media_loaded")
@@ -70,6 +70,10 @@ func test_public_facade_exposes_stable_video_player_surface() -> void:
 	assert_true(_manager.has_method("reset"), "Public facade should expose reset")
 	assert_true(_manager.has_method("unload"), "Public facade should expose unload")
 	assert_true(_manager.has_method("seek"), "Public facade should expose seek")
+	assert_true(_manager.has_method("get_transport_capabilities"), "Public facade should expose transport capability inspection")
+	assert_true(_manager.has_method("get_transport_status"), "Public facade should expose transport status inspection")
+	assert_true(_manager.has_method("step_frames"), "Public facade should expose frame stepping")
+	assert_true(_manager.has_method("seek_to_frame"), "Public facade should expose frame-addressed seeking")
 	assert_true(_manager.has_method("set_loop"), "Public facade should expose set_loop")
 	assert_true(_manager.has_method("set_rate"), "Public facade should expose set_rate")
 	assert_true(_manager.has_method("set_fit_mode"), "Public facade should expose set_fit_mode")
@@ -159,6 +163,30 @@ func test_primary_slot_transport_controls_preserve_existing_behavior_and_report_
 	_manager.stop()
 	assert_eq(String(_manager.get_state().get("state", "")), AeroVideoPlayerManager.STATE_READY, "stop should return the contract to ready when media remains loaded")
 	assert_eq(float(_manager.get_position()), 0.0, "stop should reset position to zero")
+
+func test_fake_backend_transport_contract_is_exact_owned_frame_index() -> void:
+	_manager.load({
+		"path": SAMPLE_VIDEO_PATH,
+		"duration_hint": 10.0,
+		"fps_hint": 20.0,
+	})
+
+	var capabilities := _manager.get_transport_capabilities()
+	assert_eq(String(capabilities.get("transport_mode", "")), AeroVideoPlayerManager.TRANSPORT_MODE_EXACT_OWNED_FRAME_INDEX, "Default fake backend should report exact owned-frame transport")
+	assert_true(bool(capabilities.get("can_step_forward", false)), "Fake backend should advertise forward frame stepping")
+	assert_true(bool(capabilities.get("can_seek_frame", false)), "Fake backend should advertise frame-addressed seeking")
+	assert_eq(float(capabilities.get("nominal_fps", -1.0)), 20.0, "Fake backend should surface the configured nominal fps")
+
+	var seek_result := _manager.seek_to_frame(10)
+	assert_true(bool(seek_result.get("success", false)), "seek_to_frame should succeed on the fake backend")
+	assert_almost_eq(_manager.get_position(), 0.5, 0.0001, "Frame-addressed seek should move to the expected timestamp on the fake backend")
+	var status := _manager.get_transport_status()
+	assert_eq(int(status.get("frame_index", -1)), 10, "Transport status should report the current owned frame index")
+	assert_eq(int(status.get("frame_count", -1)), 200, "Transport status should report the synthetic frame count")
+
+	var step_result := _manager.step_frames(5)
+	assert_true(bool(step_result.get("success", false)), "step_frames should succeed on the fake backend")
+	assert_eq(int(_manager.get_transport_status().get("frame_index", -1)), 15, "Frame stepping should advance the owned frame index exactly")
 
 func test_fit_mode_and_audio_level_can_be_toggled_per_slot_before_and_after_load() -> void:
 	_manager.set_fit_mode(AeroVideoPlayerManager.FIT_MODE_STRETCH, "left")
@@ -295,6 +323,39 @@ func test_manager_load_accepts_http_url_sources_without_explicit_kind_when_vendo
 	assert_eq(String(manager.get_media_info("remote").get("kind", "")), AeroVideoPlayerManager.SOURCE_KIND_URL, "Media info should report the normalized remote url source kind")
 	assert_eq(String(manager.get_media_info("remote").get("path", "")), "https://upload.wikimedia.org/wikipedia/commons/6/65/Examplevideo.ogv", "Manager should preserve the caller-facing URL after load")
 	assert_eq(String(manager.get_media_info("remote").get("resolved_path", "")), _external_sample_path, "Injected vendor backend should use the deterministic resolved cache file path for remote loads")
+
+func test_injected_godot_backend_reports_approx_time_seek_and_refuses_exact_frame_transport() -> void:
+	var manager := AeroVideoPlayerManager.new()
+	manager.set_backend_factory(Callable(self, "_make_fake_vendor_backend"))
+	add_child_autofree(manager)
+	manager._initialize()
+	var slot_errors: Array[Dictionary] = []
+	manager.slot_error_raised.connect(func(slot_name: String, error_info: Dictionary): slot_errors.append({"slot": slot_name, "error": error_info.duplicate(true)}))
+
+	var surface := Control.new()
+	surface.name = "TransportManagedSurface"
+	surface.custom_minimum_size = Vector2(640, 360)
+	add_child_autofree(surface)
+	manager.attach_surface(surface, "transport")
+	manager.load({
+		"path": SAMPLE_VIDEO_PATH,
+		"duration_hint": SAMPLE_DURATION_SECONDS,
+		"start_time": 2.0,
+		"fps_hint": 30.0,
+	}, "transport")
+
+	var capabilities := manager.get_transport_capabilities("transport")
+	assert_eq(String(capabilities.get("transport_mode", "")), AeroVideoPlayerManager.TRANSPORT_MODE_APPROX_TIME_SEEK, "Injected Godot backend should report approximate time-seek transport for the built-in .ogv path")
+	assert_false(bool(capabilities.get("can_step_forward", true)), "Injected Godot backend should refuse exact frame stepping")
+	assert_false(bool(capabilities.get("can_seek_frame", true)), "Injected Godot backend should refuse exact frame-addressed seek")
+
+	var step_result := manager.step_frames(1, "transport")
+	assert_false(bool(step_result.get("success", true)), "Frame stepping should fail against the approximate-only Godot backend")
+	assert_eq(String(step_result.get("code", "")), AeroVideoPlayerManager.ERROR_TRANSPORT_UNSUPPORTED, "Approximate-only transport should fail with the shared transport-unsupported code")
+	assert_eq(String(manager.get_state("transport").get("state", "")), AeroVideoPlayerManager.STATE_READY, "Refused frame stepping should not poison the slot playback state")
+	assert_eq(float(manager.get_position("transport")), 2.0, "Refused frame stepping should leave the current timestamp unchanged")
+	assert_eq(String(manager.get_last_error("transport").get("code", "")), AeroVideoPlayerManager.ERROR_TRANSPORT_UNSUPPORTED, "Manager should retain the non-fatal transport refusal as last_error")
+	assert_eq(slot_errors.size(), 1, "Manager should still surface one slot-scoped error event for the refused transport operation")
 
 func test_invalid_source_raises_slot_scoped_contract_error_without_crashing() -> void:
 	var slot_errors: Array[Dictionary] = []

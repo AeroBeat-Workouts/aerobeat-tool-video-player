@@ -35,7 +35,7 @@ enum PlaybackState {
 	ERROR,
 }
 
-const VERSION: String = "0.6.0"
+const VERSION: String = "0.7.0"
 const DEFAULT_SLOT := "primary"
 const FIT_MODE_STRETCH := "stretch"
 const FIT_MODE_CONTAIN := "contain"
@@ -76,6 +76,10 @@ const ERROR_INVALID_SOURCE := AeroVideoPlaybackContract.ERROR_INVALID_SOURCE
 const ERROR_INVALID_SURFACE := AeroVideoPlaybackContract.ERROR_INVALID_SURFACE
 const ERROR_BACKEND_REJECTED := AeroVideoPlaybackContract.ERROR_BACKEND_REJECTED
 const ERROR_NOT_READY := AeroVideoPlaybackContract.ERROR_NOT_READY
+const TRANSPORT_MODE_EXACT_DECODED_FRAME := BackendInterfaceScript.TRANSPORT_MODE_EXACT_DECODED_FRAME
+const TRANSPORT_MODE_EXACT_OWNED_FRAME_INDEX := BackendInterfaceScript.TRANSPORT_MODE_EXACT_OWNED_FRAME_INDEX
+const TRANSPORT_MODE_APPROX_TIME_SEEK := BackendInterfaceScript.TRANSPORT_MODE_APPROX_TIME_SEEK
+const ERROR_TRANSPORT_UNSUPPORTED := BackendInterfaceScript.TRANSPORT_UNSUPPORTED_CODE
 #endregion
 
 #region EXPORTS
@@ -463,6 +467,80 @@ func get_position(slot_name: String = "") -> float:
 	var backend: AeroVideoPlayerBackend = session.get("backend", null)
 	return backend.get_position() if backend != null else 0.0
 
+func get_transport_capabilities(slot_name: String = "") -> Dictionary:
+	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	var capabilities: Dictionary = backend.get_transport_capabilities() if backend != null else {}
+	var source: Dictionary = _ensure_source_defaults(session.get("loaded_source", {}).duplicate(true), resolved_slot)
+	return {
+		"slot": resolved_slot,
+		"backend": str(session.get("backend_name", "")),
+		"media_loaded": bool(session.get("has_loaded_media", false)),
+		"transport_mode": str(capabilities.get("transport_mode", TRANSPORT_MODE_APPROX_TIME_SEEK)),
+		"can_step_forward": bool(capabilities.get("can_step_forward", false)),
+		"can_step_backward": bool(capabilities.get("can_step_backward", false)),
+		"can_seek_frame": bool(capabilities.get("can_seek_frame", false)),
+		"nominal_fps": capabilities.get("nominal_fps", null),
+		"frame_duration_sec": capabilities.get("frame_duration_sec", null),
+		"exactness_note": str(capabilities.get("exactness_note", "")),
+		"limitation_code": str(capabilities.get("limitation_code", "")),
+		"source": _with_cover_mode_alias(source),
+	}
+
+func get_transport_status(slot_name: String = "") -> Dictionary:
+	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name)
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	var status: Dictionary = backend.get_transport_status() if backend != null else {}
+	var state := get_state(resolved_slot)
+	return {
+		"slot": resolved_slot,
+		"backend": str(session.get("backend_name", "")),
+		"media_loaded": bool(session.get("has_loaded_media", false)),
+		"transport_mode": str(status.get("transport_mode", TRANSPORT_MODE_APPROX_TIME_SEEK)),
+		"can_step_forward": bool(status.get("can_step_forward", false)),
+		"can_step_backward": bool(status.get("can_step_backward", false)),
+		"can_seek_frame": bool(status.get("can_seek_frame", false)),
+		"frame_index": status.get("frame_index", null),
+		"frame_count": status.get("frame_count", null),
+		"nominal_fps": status.get("nominal_fps", null),
+		"frame_duration_sec": status.get("frame_duration_sec", null),
+		"paused": bool(status.get("paused", false)),
+		"position_sec": float(status.get("position_sec", state.get("position", 0.0))),
+		"duration_sec": float(status.get("duration_sec", state.get("duration", 0.0))),
+		"exactness_note": str(status.get("exactness_note", "")),
+		"limitation_code": str(status.get("limitation_code", "")),
+	}
+
+func step_frames(delta_frames: int, slot_name: String = "") -> Dictionary:
+	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name)
+	if not _ensure_loaded_for_slot(resolved_slot, "Cannot step frames before media has been loaded."):
+		return AeroVideoPlaybackContract.fail(ERROR_NOT_READY, "Cannot step frames before media has been loaded.", {"slot": resolved_slot})
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	var result := backend.step_frames(delta_frames)
+	if not _handle_transport_result_for_slot(resolved_slot, result, ERROR_TRANSPORT_UNSUPPORTED, "Backend could not step frames."):
+		return result
+	_emit_position_changed_for_slot(resolved_slot, backend.get_position(), backend.get_duration())
+	return result
+
+func seek_to_frame(frame_index: int, slot_name: String = "") -> Dictionary:
+	_initialize()
+	var resolved_slot := _resolve_slot_name(slot_name)
+	if not _ensure_loaded_for_slot(resolved_slot, "Cannot seek to a frame before media has been loaded."):
+		return AeroVideoPlaybackContract.fail(ERROR_NOT_READY, "Cannot seek to a frame before media has been loaded.", {"slot": resolved_slot})
+	var session := _ensure_slot(resolved_slot)
+	var backend: AeroVideoPlayerBackend = session.get("backend", null)
+	var result := backend.seek_to_frame(frame_index)
+	if not _handle_transport_result_for_slot(resolved_slot, result, ERROR_TRANSPORT_UNSUPPORTED, "Backend could not seek to the requested frame."):
+		return result
+	_emit_position_changed_for_slot(resolved_slot, backend.get_position(), backend.get_duration())
+	return result
+
 func get_media_info(slot_name: String = "") -> Dictionary:
 	_initialize()
 	var resolved_slot := _resolve_slot_name(slot_name)
@@ -589,6 +667,21 @@ func _lifecycle_apply_result_for_slot(slot_name: String, result: Dictionary, fal
 		String(result.get(AeroVideoPlaybackContract.RESULT_MESSAGE, fallback_message)),
 		result.get(AeroVideoPlaybackContract.RESULT_DETAIL, {}),
 		true
+	)
+	return false
+
+func _handle_transport_result_for_slot(slot_name: String, result: Dictionary, fallback_code: String, fallback_message: String) -> bool:
+	if bool(result.get(AeroVideoPlaybackContract.RESULT_SUCCESS, false)):
+		var session := _ensure_slot(slot_name)
+		session["last_error"] = {}
+		_slots[_normalize_slot_name(slot_name)] = session
+		return true
+	_raise_error_for_slot(
+		slot_name,
+		String(result.get(AeroVideoPlaybackContract.RESULT_CODE, fallback_code)),
+		String(result.get(AeroVideoPlaybackContract.RESULT_MESSAGE, fallback_message)),
+		result.get(AeroVideoPlaybackContract.RESULT_DETAIL, {}),
+		false
 	)
 	return false
 

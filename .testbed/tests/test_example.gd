@@ -38,7 +38,7 @@ func test_plugin_cfg_describes_video_player_facade() -> void:
 		EXPECTED_PLUGIN_DESCRIPTION,
 		"plugin.cfg description should stay aligned with the slot-aware facade scope"
 	)
-	assert_eq(config.get_value("plugin", "version", ""), "0.6.0", "plugin version should reflect fit-mode alignment + multi-slot support")
+	assert_eq(config.get_value("plugin", "version", ""), "0.7.0", "plugin version should reflect the truthful transport contract addition")
 
 func test_addons_manifest_keeps_expected_dependencies_only() -> void:
 	var manifest_text := _read_repo_file(ADDONS_MANIFEST_PATH)
